@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.1.1
+npm install github:MegPrime/merchant-sdk#v0.1.2
 ```
 
 No registry account or token is needed. The package still installs as

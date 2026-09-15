@@ -23,9 +23,11 @@ path in the package README instead. That path needs no server.
    payment status itself (section 5).
 4. **Amounts are strings in minor units, never floats.** `$12.50` is
    `"12500000"` (6 decimals). Use integer or BigInt arithmetic.
-5. **Use one `client_ref` per order, not one per attempt.** It must be a UUID. The
-   order's own UUID is the right choice. If a retry sends the same `client_ref`,
-   you get the same payment request back and the buyer isn't charged twice.
+5. **Use one `client_ref` per payment attempt, not per click.** It must be a
+   UUID, stored on the order before the call. A retry that sends the same
+   `client_ref` gets the same payment request back, so the buyer isn't charged
+   twice. Only issue a new one when the old request can no longer be used: it
+   expired, it was cancelled, or the order total changed.
 6. **Branch on error codes, never on message text.**
 
 ---
@@ -74,7 +76,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.1.1
+npm install github:MegPrime/merchant-sdk#v0.1.2
 ```
 
 No registry account or token is needed. The package still installs as
@@ -84,7 +86,7 @@ If the build environment can't fetch from GitHub over git, install the release
 tarball instead:
 
 ```bash
-npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.1.1/megprime-merchant-sdk-0.1.1.tgz
+npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.1.2/megprime-merchant-sdk-0.1.2.tgz
 ```
 
 The SDK runs in the browser. Your server needs no SDK, only HTTP.
@@ -102,7 +104,7 @@ X-Secret-Key: msk_…
 
 {
   "notional_uoa": "12500000",     // required. positive integer string, minor units, ≤ 39 digits
-  "client_ref":   "<order uuid>", // strongly recommended. must be a UUID
+  "client_ref":   "<attempt uuid>", // strongly recommended. must be a UUID
   "memo":         "Booking #123"  // optional. ≤ 200 chars, shown to the merchant
 }
 ```
@@ -189,7 +191,7 @@ Deno.serve(async (req) => {
   // The ONLY source of the amount. Never read a price from the request body.
   const { data: order, error } = await supabase
     .from('orders')
-    .select('id, status, total_cents, fulfillment_id')
+    .select('id, status, total_cents, payment_attempt_id, payment_amount_uoa, payment_status, fulfillment_id')
     .eq('id', orderId)
     .single();
   if (error || !order) return json({ error: 'order_not_found' }, 404);
@@ -198,12 +200,49 @@ Deno.serve(async (req) => {
   // cents → minor units, integer math only. 1 cent = 10^(DECIMALS-2) minor units.
   const notional = (BigInt(order.total_cents) * 10n ** BigInt(DECIMALS - 2)).toString();
 
+  // Service role for writes, because this is the server recording a fact.
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  // Reuse the current attempt unless it can no longer be paid. Reusing is what
+  // makes a double tap or a lost response return the SAME request. A new
+  // attempt is needed only when the old request is dead or is for a different
+  // amount, because MegPrime returns the original request for a reused ref.
+  const DEAD = ['expired', 'cancelled', 'declined', 'failed', 'voided'];
+  let deadUpstream = false;
+  if (order.fulfillment_id) {
+    // Our row may not have caught up (e.g. the confirm job hasn't run since it
+    // expired), so ask MegPrime. A failed lookup is UNKNOWN: reuse the attempt,
+    // which at worst returns the old request again. It never double charges.
+    const st = await fetch(`${GATEWAY}/api/v1/enforcer/fulfillments/${encodeURIComponent(order.fulfillment_id)}/status`)
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    deadUpstream = DEAD.includes(String(st?.data?.status ?? '').toLowerCase());
+  }
+  const needNewAttempt =
+    !order.payment_attempt_id ||
+    order.payment_amount_uoa !== notional ||
+    DEAD.includes(order.payment_status) ||
+    deadUpstream;
+  let attemptId: string = order.payment_attempt_id;
+  if (needNewAttempt) {
+    attemptId = crypto.randomUUID();
+    // Saved BEFORE the call, so a retry after a lost response reuses it. If
+    // this write fails, stop: calling anyway would let the next retry mint yet
+    // another attempt, and that is how one order gets two payment requests.
+    const { error: saveErr } = await admin.from('orders').update({
+      payment_attempt_id: attemptId,
+      payment_amount_uoa: notional,
+      payment_status: 'creating',
+      fulfillment_id: null,
+    }).eq('id', order.id);
+    if (saveErr) return json({ error: 'order_update_failed' }, 500);
+  }
+
   const res = await fetch(`${GATEWAY}/api/v1/mpmerchant/server/pay-requests`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Secret-Key': SECRET_KEY },
     body: JSON.stringify({
       notional_uoa: notional,
-      client_ref: order.id,            // one per ORDER. A retry returns the same request.
+      client_ref: attemptId,           // one per ATTEMPT. A retry returns the same request.
       memo: `Order ${order.id}`,
     }),
   });
@@ -219,18 +258,16 @@ Deno.serve(async (req) => {
     return json({ error: 'payment_unconfirmed' }, 503);
   }
   if (data.notional_uoa !== notional) {
-    // Same client_ref, different total: the order changed after a request was
-    // raised, and MegPrime returned the ORIGINAL request. Never show it.
-    // Issue a new client_ref for the new total (see section 7).
-    return json({ error: 'order_total_changed' }, 409);
+    // Should be impossible after the attempt logic above. If it happens, the
+    // request MegPrime returned is for a different amount. Never show it.
+    console.error('megprime amount mismatch', data.notional_uoa, notional);
+    return json({ error: 'amount_mismatch' }, 409);
   }
   if (data.currency && data.currency.decimals !== DECIMALS) {
     console.error('megprime currency scale mismatch', data.currency);
     return json({ error: 'currency_mismatch' }, 500);
   }
 
-  // Service role for the write, because this is the server recording a fact.
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   await admin.from('orders').update({
     fulfillment_id: data.fulfillment_id,
     payment_status: 'awaiting_payment',
@@ -241,9 +278,12 @@ Deno.serve(async (req) => {
 });
 ```
 
-Adjust the table and column names to match the app. **Keep the shape:** load the
-order, compute on the server, send `client_ref = order id`, return only the
-`fulfillmentId`.
+This needs four columns on the order: `payment_attempt_id uuid`,
+`payment_amount_uoa text`, `payment_status text` and `fulfillment_id text`
+(plus `paid_at timestamptz` for section 5). Adjust the table and column names to
+match the app. **Keep the shape:** load the order, compute on the server, reuse
+the attempt's `client_ref` unless the old request is dead or for a different
+amount, and return only the `fulfillmentId`.
 
 For another backend (Node, Next.js route handler, Python, Go), make the same
 single HTTP call. The rules in section 0 still apply.
@@ -300,7 +340,7 @@ Deno.serve(async (req) => {
 
   // The fulfillment id comes from OUR row, never from the request.
   const { data: order } = await admin
-    .from('orders').select('id, status, total_cents, fulfillment_id').eq('id', orderId).single();
+    .from('orders').select('id, status, total_cents, fulfillment_id, payment_amount_uoa').eq('id', orderId).single();
   if (!order?.fulfillment_id) return json({ state: 'unknown' }, 404);
   if (order.status === 'paid') return json({ state: 'paid' });
 
@@ -308,7 +348,10 @@ Deno.serve(async (req) => {
   if (!res.ok) return json({ state: 'unknown' }, 502);
   const { data } = await res.json();
 
-  const expected = (BigInt(order.total_cents) * 10n ** BigInt(DECIMALS - 2)).toString();
+  // What was sent for this attempt, and it must still be the order's total.
+  const expected = order.payment_amount_uoa;
+  const currentTotal = (BigInt(order.total_cents) * 10n ** BigInt(DECIMALS - 2)).toString();
+  if (!expected || expected !== currentTotal) return json({ state: 'unknown' }, 409);
   const status = String(data?.status ?? '').toLowerCase();
 
   if (PAID.has(status)) {
@@ -348,10 +391,16 @@ import { supabase } from '@/integrations/supabase/client';
 export function PayWithMegPrime({ orderId, onPaid }: { orderId: string; onPaid: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string>();
+  const [canRestart, setCanRestart] = useState(false);
+  // Bumping this re-runs the effect. The server decides whether that reuses
+  // the current request or issues a new one (section 4).
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let checkout: CheckoutHandle | undefined;
     let cancelled = false;
+    setError(undefined);
+    setCanRestart(false);
 
     (async () => {
       // Send the ORDER ID. Never an amount.
@@ -361,6 +410,7 @@ export function PayWithMegPrime({ orderId, onPaid }: { orderId: string; onPaid: 
       if (cancelled) return;
       if (error || !data?.fulfillmentId) {
         setError("We couldn't start this payment. Please try again.");
+        setCanRestart(true);
         return;
       }
 
@@ -378,19 +428,24 @@ export function PayWithMegPrime({ orderId, onPaid }: { orderId: string; onPaid: 
         onError: (err) => setError(err.retryable ? 'Connection problem, retrying…' : err.message),
         onCancel: () => { /* widget closed. The request may STILL be paid. */ },
         onStateChange: (state) => {
-          if (state === 'expired') setError('This payment window expired. Start again to get a new code.');
+          if (state === 'expired') {
+            setError('This payment window expired. Start again to get a new code.');
+            setCanRestart(true);
+          }
         },
       });
       await checkout.start();
     })();
 
     return () => { cancelled = true; checkout?.destroy(); };
-  }, [orderId]);
+  }, [orderId, attempt]);
 
   return (
     <div>
       {error && <p role="alert">{error}</p>}
-      <div ref={ref} />
+      {canRestart && <button type="button" onClick={() => setAttempt((n) => n + 1)}>Start again</button>}
+      {/* keyed so a restart gets a fresh element: the widget attaches a shadow root, which can't be attached twice */}
+      <div key={`${orderId}-${attempt}`} ref={ref} />
     </div>
   );
 }
@@ -422,20 +477,21 @@ from `checkout.snapshot.payUrl` and react to `onStateChange(state, snapshot)`.
 
 ## 7. Edge cases the agent must handle
 
-- **Buyer taps Pay twice, or the network drops mid-create.** `client_ref = order
-  id` makes the server call return the same request. Don't generate a new
-  `client_ref` per click.
-- **Buyer wants a new code after `expired`.** The old request is dead. Create a
-  new order, or give the order a fresh `payment_attempt_id` UUID and send that as
-  `client_ref`. Reusing the old `client_ref` returns the expired request.
+- **Buyer taps Pay twice, or the network drops mid-create.** The stored
+  `payment_attempt_id` is reused, so the server call returns the same request.
+  Don't generate a new `client_ref` per click.
+- **Buyer wants a new code after `expired`.** The create function sees the dead
+  status and issues a new `payment_attempt_id` automatically. "Start again" just
+  calls it again. Reusing the old `client_ref` would return the expired request.
 - **Widget closed, or the page navigated away.** Closing doesn't cancel anything.
   A buyer with a screenshot of the QR can still pay until the deadline. Keep the
   order `awaiting_payment` and let the server confirmation job settle it.
 - **Order total changes after a request exists** (item added, coupon applied).
   The existing request is frozen at the old amount, and resending the same
-  `client_ref` returns it unchanged. The create function refuses that with
-  `order_total_changed`. Issue a new `client_ref` and create a new request. Section 5's `notional_uoa === expected` check
-  refuses to mark the order paid on the stale amount.
+  `client_ref` would return it unchanged. The create function sees that the
+  total no longer matches `payment_amount_uoa` and issues a new attempt. Section
+  5 refuses to mark the order paid if the stored amount doesn't match the
+  current total.
 - **Underpayment.** Handled by the `paid_sum >= notional_uoa` check. Never mark
   paid on status alone.
 
@@ -446,7 +502,7 @@ from `checkout.snapshot.payUrl` and react to `onStateChange(state, snapshot)`.
 - [ ] `grep -r "msk_" src/` and the built client bundle find nothing
 - [ ] The secret key is read only from a server-side secret
 - [ ] The create endpoint reads the amount from the database, not from the request
-- [ ] `client_ref` is the order's UUID (or a per-attempt UUID stored on the order)
+- [ ] `client_ref` is a per-attempt UUID stored on the order before the call, reused on retry, and replaced only when the request is dead or the total changed
 - [ ] `fulfillment_id` is saved on the order
 - [ ] A missing `fulfillment_id` shows an error, not a QR
 - [ ] The order is marked paid only by the server, after checking `status` **and** `paid_sum`
