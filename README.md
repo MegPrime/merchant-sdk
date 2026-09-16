@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.1.2
+npm install github:MegPrime/merchant-sdk#v0.2.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -74,6 +74,69 @@ From the customer's side this is identical — same QR, same polling, same
 callbacks. The only difference is who decided the price, and that is the
 difference that matters: a total computed on the customer's device is a total
 the customer chooses.
+
+## The QR
+
+The bundled widget draws one for you. Without a container, draw it yourself —
+the SDK encodes it, so you do not have to learn which field to encode:
+
+```ts
+const checkout = createCheckout({ publishableKey, priceId, onStateChange: render });
+await checkout.start();
+
+img.src = await checkout.qrDataUrl();     // PNG data url
+receipt.innerHTML = await checkout.qrSvg(); // SVG, for anything printed
+```
+
+Or from an id your server already has — a refund, a reprint, another process:
+
+```ts
+import { payUrlFor, toQrSvg } from '@megprime/merchant-sdk';
+await toQrSvg(payUrlFor(fulfillmentId));
+```
+
+**Encode `payUrl`, never the id.** A QR of a fulfillment id scans cleanly and
+resolves to nothing, which is worse than an error because it looks like it
+worked. Both functions refuse anything that is not a URL, and say why.
+
+## Taking payments and refunds from your server
+
+The secret key (`msk_…`) lives on a server and nowhere else, so it has its own
+entry point — importing it into a component pulls a module that **refuses to run
+in a browser**:
+
+```ts
+import { createPaymentRequest, proposeRefund, getRefundProposal, getPaymentStatus }
+  from '@megprime/merchant-sdk/server';
+
+const sale = await createPaymentRequest({
+  secretKey: process.env.MEGPRIME_SECRET_KEY!,
+  amountUoa: '12500000',          // minor units. Never a float
+  clientRef: order.id,            // one per sale: a retry returns the SAME request
+});
+// send the browser sale.fulfillmentId — and nothing else
+
+// later, the guest cancels
+const proposal = await proposeRefund({
+  secretKey: process.env.MEGPRIME_SECRET_KEY!,
+  fulfillmentId: sale.fulfillmentId!,
+  amountUoa: '12500000',
+  reason: 'Booking cancelled',
+  clientRef: refundDecisionId,
+});
+
+// the STORE OWNER decides. Poll for the answer
+const now = await getRefundProposal({ secretKey, proposalId: proposal.id });
+// 'proposed' → waiting on the owner
+// 'approved' → now.refundFulfillmentId is the refund they must pay
+// 'rejected' | 'failed' → now.decisionReason says why
+```
+
+**Your key can ask for a refund. It cannot grant one**, and it never says where
+the money goes: MegPrime sends it back to whoever actually paid the original.
+The owner approves and pays it themselves. Watch an approved refund land with
+`getPaymentStatus(refundFulfillmentId)` — the same credential-free poll the
+browser uses.
 
 ## Headless
 

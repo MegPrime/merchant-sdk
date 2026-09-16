@@ -1,6 +1,8 @@
+import { type QrOptions } from './qr.js';
 import type { CheckoutOptions, CheckoutSnapshot } from './types.js';
 export * from './types.js';
 export { formatUoa } from './money.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, QrInputError, type QrOptions } from './qr.js';
 export interface CheckoutHandle {
     start(): Promise<CheckoutSnapshot>;
     /**
@@ -14,6 +16,17 @@ export interface CheckoutHandle {
     cancel(): void;
     destroy(): void;
     readonly snapshot: CheckoutSnapshot;
+    /**
+     * This checkout's QR, as a PNG data URL.
+     *
+     * Sugar for `toQrDataUrl(snapshot.payUrl)`, which is the whole point: the
+     * headless path should not require knowing which field to encode. Rejects
+     * with a QrInputError before the request exists — wait for
+     * `awaiting_payment`, or call it from onStateChange.
+     */
+    qrDataUrl(options?: QrOptions): Promise<string>;
+    /** The same code as an SVG string. Prefer it for anything printed. */
+    qrSvg(options?: QrOptions): Promise<string>;
 }
 /**
  * Create a checkout.

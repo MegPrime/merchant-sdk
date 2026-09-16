@@ -1,6 +1,6 @@
 {
   "name": "@megprime/merchant-sdk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Take payments into a MegPrime store from your own app. No backend required.",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,6 +10,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./qr": {
+      "types": "./dist/qr.d.ts",
+      "import": "./dist/qr.js"
     }
   },
   "files": [

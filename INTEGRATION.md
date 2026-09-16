@@ -76,7 +76,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.1.2
+npm install github:MegPrime/merchant-sdk#v0.2.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -86,7 +86,7 @@ If the build environment can't fetch from GitHub over git, install the release
 tarball instead:
 
 ```bash
-npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.1.2/megprime-merchant-sdk-0.1.2.tgz
+npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.2.0/megprime-merchant-sdk-0.2.0.tgz
 ```
 
 The SDK runs in the browser. Your server needs no SDK, only HTTP.
@@ -287,6 +287,24 @@ amount, and return only the `fulfillmentId`.
 
 For another backend (Node, Next.js route handler, Python, Go), make the same
 single HTTP call. The rules in section 0 still apply.
+
+### Using the SDK instead of raw HTTP (optional)
+
+The same call, with the amount and key checks done for you. It **refuses to run
+in a browser**, so importing it into a component fails loudly instead of leaking
+the key:
+
+```ts
+import { createPaymentRequest } from '@megprime/merchant-sdk/server';
+
+const sale = await createPaymentRequest({
+  secretKey: Deno.env.get('MEGPRIME_SECRET_KEY')!,
+  amountUoa: notional,      // minor units, integer string
+  clientRef: attemptId,
+  memo: `Order ${order.id}`,
+});
+// sale.fulfillmentId, sale.payUrl, sale.currency, sale.deadline
+```
 
 ---
 
@@ -497,7 +515,60 @@ from `checkout.snapshot.payUrl` and react to `onStateChange(state, snapshot)`.
 
 ---
 
-## 8. Done checklist
+## 8. Refunds
+
+A refund sends a **settled** payment back to whoever paid it. Three rules shape
+the API:
+
+- **Your key may ASK, never grant.** `proposeRefund` queues it; the **store
+  owner** approves it in the MegPrime app and pays it from the store's
+  settlement wallet.
+- **Nobody names a destination.** MegPrime reads it from the original payment,
+  so a refund cannot be pointed anywhere else.
+- **Never more than arrived.** The limit is what actually settled, minus refunds
+  already claimed. Over it, the owner's approval is refused and the proposal
+  ends `failed` with the reason.
+
+```ts
+import { proposeRefund, getRefundProposal, getPaymentStatus }
+  from '@megprime/merchant-sdk/server';
+
+// 1. ask (server-side, from your own cancellation flow)
+const proposal = await proposeRefund({
+  secretKey: Deno.env.get('MEGPRIME_SECRET_KEY')!,
+  fulfillmentId: order.fulfillment_id,
+  amountUoa: order.payment_amount_uoa,   // partial refunds are fine
+  reason: 'Booking cancelled by the guest',
+  clientRef: refundDecisionId,           // a retry returns the SAME proposal
+});
+// store proposal.id on the order
+
+// 2. poll for the owner's decision
+const now = await getRefundProposal({ secretKey, proposalId: proposal.id });
+switch (now.state) {
+  case 'proposed': break;                     // waiting on the merchant
+  case 'rejected': /* now.decisionReason */ break;
+  case 'failed':   /* now.decisionReason */ break;
+  case 'approved': {
+    // 3. the owner still has to PAY it. Watch the money actually move.
+    const s = await getPaymentStatus(now.refundFulfillmentId!);
+    if (s.status === 'confirmed' && BigInt(s.paidUoa) >= BigInt(now.amountUoa)) {
+      // the customer has their money back
+    }
+  }
+}
+```
+
+**Do not tell the customer they have been refunded on `approved`.** That is the
+merchant agreeing to pay, not money moving. Wait for the refund's own payment to
+confirm, exactly as you waited for the sale.
+
+**Show the customer a QR only for a sale**, never for a refund: a refund is paid
+by the merchant, in their own app.
+
+---
+
+## 9. Done checklist
 
 - [ ] `grep -r "msk_" src/` and the built client bundle find nothing
 - [ ] The secret key is read only from a server-side secret
@@ -509,3 +580,4 @@ from `checkout.snapshot.payUrl` and react to `onStateChange(state, snapshot)`.
 - [ ] A background job confirms orders left in `awaiting_payment`
 - [ ] `expired` gets a "start again" action, not an error screen
 - [ ] The order total is shown in your own UI
+- [ ] Refunds (if used): proposed server-side, never marked refunded until the refund's own payment confirms
