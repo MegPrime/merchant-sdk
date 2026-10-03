@@ -121,7 +121,7 @@ export async function createPaymentRequest(o) {
             clientRef: str(d.client_ref),
             // Built here so nothing downstream has to know the URL shape. Absent
             // exactly when the id is — a link to nothing is worse than no link.
-            ...(id ? { payUrl: payUrlForId(id) } : {}),
+            ...(id ? { payUrl: payUrlForId(id), walletPayUrl: walletPayUrlForId(id) } : {}),
         };
     });
 }
@@ -207,6 +207,6 @@ export async function getPaymentStatus(fulfillmentId, o) {
 }
 // Re-exported from qr.ts so a server rendering a receipt does not need a second
 // import path. Drawing a QR needs no credential.
-export { toQrDataUrl, toQrSvg, payUrlFor, QrInputError } from './qr.js';
-import { payUrlFor as payUrlForId } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, QrInputError } from './qr.js';
+import { payUrlFor as payUrlForId, walletPayUrlFor as walletPayUrlForId } from './qr.js';
 export { formatUoa } from './money.js';

@@ -2,7 +2,7 @@ import { type QrOptions } from './qr.js';
 import type { CheckoutOptions, CheckoutSnapshot } from './types.js';
 export * from './types.js';
 export { formatUoa } from './money.js';
-export { toQrDataUrl, toQrSvg, payUrlFor, QrInputError, type QrOptions } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, QrInputError, type QrOptions } from './qr.js';
 export interface CheckoutHandle {
     start(): Promise<CheckoutSnapshot>;
     /**

@@ -1,6 +1,7 @@
 import { isTerminal, } from './types.js';
 import { errorFromResponse, makeError } from './errors.js';
 import { uuid } from './uuid.js';
+import { walletPayUrlFor } from './qr.js';
 const DEFAULT_GATEWAY = 'https://api.megprimepay.com';
 const DEFAULT_PAY_ORIGIN = 'https://app.megprimepay.com';
 const MAX_MEMO = 200;
@@ -79,6 +80,7 @@ export class Checkout {
         if (this.attachTo) {
             this.snap.fulfillmentId = this.attachTo;
             this.snap.payUrl = `${DEFAULT_PAY_ORIGIN}/send?fulfillment_id=${encodeURIComponent(this.attachTo)}`;
+            this.snap.walletPayUrl = walletPayUrlFor(this.attachTo);
             this.startedAt = Date.now();
             this.transition('awaiting_payment');
             this.watchVisibility();
@@ -130,6 +132,7 @@ export class Checkout {
             if (dl)
                 this.snap.deadline = new Date(dl);
             this.snap.payUrl = `${DEFAULT_PAY_ORIGIN}/send?fulfillment_id=${encodeURIComponent(fulfillmentId)}`;
+            this.snap.walletPayUrl = walletPayUrlFor(fulfillmentId);
             this.startedAt = Date.now();
             this.transition('awaiting_payment');
             this.watchVisibility();

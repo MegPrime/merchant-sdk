@@ -49,6 +49,8 @@ export interface PaymentRequest {
     clientRef?: string;
     /** The deep link to encode as a QR, when there is a request to pay. */
     payUrl?: string;
+    /** The wallet link: any Base wallet holding USDC, no account. */
+    walletPayUrl?: string;
 }
 export type RefundState = 'proposed' | 'approved' | 'rejected' | 'failed';
 export interface RefundProposal {
@@ -111,6 +113,6 @@ export declare function getPaymentStatus(fulfillmentId: string, o?: {
     amountUoa: Uoa;
     settledAt?: Date;
 }>;
-export { toQrDataUrl, toQrSvg, payUrlFor, type QrOptions, QrInputError } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, type QrOptions, QrInputError } from './qr.js';
 export type { CheckoutError, CheckoutErrorCode, Currency, Uoa } from './types.js';
 export { formatUoa } from './money.js';

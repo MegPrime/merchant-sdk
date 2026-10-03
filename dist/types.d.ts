@@ -68,6 +68,8 @@ export interface CheckoutSnapshot {
     clientRef: string;
     /** The URL a payer opens. Encode this as the QR. */
     payUrl?: string;
+    /** The wallet link (merchant.megprimepay.com): pay from any Base wallet holding USDC, no account. Test store only for now. */
+    walletPayUrl?: string;
     /** Server-authored. The client never chooses this. */
     amountUoa?: Uoa;
     /** How much has actually arrived, once polling has an answer. */

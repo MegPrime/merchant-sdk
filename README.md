@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.2.0
+npm install github:MegPrime/merchant-sdk#v0.3.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -95,7 +95,21 @@ import { payUrlFor, toQrSvg } from '@megprime/merchant-sdk';
 await toQrSvg(payUrlFor(fulfillmentId));
 ```
 
-**Encode `payUrl`, never the id.** A QR of a fulfillment id scans cleanly and
+### Two links: app and wallet
+
+Every request has two payer links, both `/send?fulfillment_id=<id>`:
+
+| Field | Origin | Use it for |
+| --- | --- | --- |
+| `payUrl` | `https://app.megprimepay.com` | MegPrime users, who pay in the app. |
+| `walletPayUrl` | `https://merchant.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
+
+The wallet link is for the test store only until MegPrime decides on KYC.
+`payUrl` is unchanged. Build either from an id with `payUrlFor(id)` and
+`walletPayUrlFor(id)`; QR helpers: `appQrSvg`, `appQrDataUrl`, `walletQrSvg`,
+`walletQrDataUrl` (or `toQrSvg(walletPayUrlFor(id))`).
+
+**Encode `payUrl` (or `walletPayUrl`), never the id.** A QR of a fulfillment id scans cleanly and
 resolves to nothing, which is worse than an error because it looks like it
 worked. Both functions refuse anything that is not a URL, and say why.
 

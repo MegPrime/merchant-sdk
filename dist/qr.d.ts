@@ -68,4 +68,21 @@ export declare function toQrSvg(payUrl: string, options?: QrOptions): Promise<st
  * host is a QR that opens nothing, and the person holding the phone cannot tell
  * that from a broken payment.
  */
+export declare const WALLET_PAY_ORIGIN = "https://merchant.megprimepay.com";
 export declare function payUrlFor(fulfillmentId: string, payOrigin?: string): string;
+/**
+ * The wallet link for a fulfillment id: https://merchant.megprimepay.com/send?fulfillment_id=<id>
+ *
+ * For anyone with a Base wallet holding USDC. No MegPrime account is needed.
+ * Test store only until MegPrime decides on KYC. `payUrlFor` (the app link) is
+ * unchanged; this is additive.
+ */
+export declare function walletPayUrlFor(fulfillmentId: string, origin?: string): string;
+/** SVG QR of the wallet link for a fulfillment id. */
+export declare function walletQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
+/** PNG data-URL QR of the wallet link for a fulfillment id. */
+export declare function walletQrDataUrl(fulfillmentId: string, options?: QrOptions): Promise<string>;
+/** SVG QR of the app link for a fulfillment id. */
+export declare function appQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
+/** PNG data-URL QR of the app link for a fulfillment id. */
+export declare function appQrDataUrl(fulfillmentId: string, options?: QrOptions): Promise<string>;

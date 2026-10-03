@@ -87,9 +87,36 @@ export async function toQrSvg(payUrl, options) {
  * host is a QR that opens nothing, and the person holding the phone cannot tell
  * that from a broken payment.
  */
+export const WALLET_PAY_ORIGIN = 'https://merchant.megprimepay.com';
 export function payUrlFor(fulfillmentId, payOrigin = 'https://app.megprimepay.com') {
     const id = String(fulfillmentId ?? '').trim();
     if (!id)
         throw new QrInputError('fulfillmentId is required');
     return `${payOrigin.replace(/\/+$/, '')}/send?fulfillment_id=${encodeURIComponent(id)}`;
+}
+/**
+ * The wallet link for a fulfillment id: https://merchant.megprimepay.com/send?fulfillment_id=<id>
+ *
+ * For anyone with a Base wallet holding USDC. No MegPrime account is needed.
+ * Test store only until MegPrime decides on KYC. `payUrlFor` (the app link) is
+ * unchanged; this is additive.
+ */
+export function walletPayUrlFor(fulfillmentId, origin = WALLET_PAY_ORIGIN) {
+    return payUrlFor(fulfillmentId, origin);
+}
+/** SVG QR of the wallet link for a fulfillment id. */
+export function walletQrSvg(fulfillmentId, options) {
+    return toQrSvg(walletPayUrlFor(fulfillmentId), options);
+}
+/** PNG data-URL QR of the wallet link for a fulfillment id. */
+export function walletQrDataUrl(fulfillmentId, options) {
+    return toQrDataUrl(walletPayUrlFor(fulfillmentId), options);
+}
+/** SVG QR of the app link for a fulfillment id. */
+export function appQrSvg(fulfillmentId, options) {
+    return toQrSvg(payUrlFor(fulfillmentId), options);
+}
+/** PNG data-URL QR of the app link for a fulfillment id. */
+export function appQrDataUrl(fulfillmentId, options) {
+    return toQrDataUrl(payUrlFor(fulfillmentId), options);
 }

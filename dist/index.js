@@ -40,7 +40,7 @@ export * from './types.js';
 export { formatUoa } from './money.js';
 // Drawing a QR is an API, not something only the bundled widget may do. See
 // qr.ts: the rule is that the thing to encode is `payUrl`, never an id.
-export { toQrDataUrl, toQrSvg, payUrlFor, QrInputError } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, QrInputError } from './qr.js';
 /**
  * Create a checkout.
  *

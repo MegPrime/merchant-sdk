@@ -76,7 +76,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.2.0
+npm install github:MegPrime/merchant-sdk#v0.3.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -86,7 +86,7 @@ If the build environment can't fetch from GitHub over git, install the release
 tarball instead:
 
 ```bash
-npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.2.0/megprime-merchant-sdk-0.2.0.tgz
+npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.3.0/megprime-merchant-sdk-0.3.0.tgz
 ```
 
 The SDK runs in the browser. Your server needs no SDK, only HTTP.
@@ -303,8 +303,15 @@ const sale = await createPaymentRequest({
   clientRef: attemptId,
   memo: `Order ${order.id}`,
 });
-// sale.fulfillmentId, sale.payUrl, sale.currency, sale.deadline
+// sale.fulfillmentId, sale.payUrl, sale.walletPayUrl, sale.currency, sale.deadline
 ```
+
+Two payer links come back. `payUrl` (https://app.megprimepay.com/send?fulfillment_id=<id>)
+is for MegPrime users. `walletPayUrl` (https://merchant.megprimepay.com/send?fulfillment_id=<id>)
+is for anyone with a Base wallet holding USDC; it needs no MegPrime account.
+The wallet link is for the test store only until MegPrime decides on KYC.
+Show whichever fits the payer, or both as two QR codes
+(`appQrSvg(id)` / `walletQrSvg(id)`).
 
 ---
 
@@ -475,7 +482,7 @@ yourself** above the widget, from your own order data. In this mode the widget
 doesn't know the currency scale, so it deliberately shows no amount.
 
 For a custom UI instead of the bundled widget, omit `container`. Then draw a QR
-from `checkout.snapshot.payUrl` and react to `onStateChange(state, snapshot)`.
+from `checkout.snapshot.payUrl` (app) or `checkout.snapshot.walletPayUrl` (any Base wallet with USDC, no account, test store only for now) and react to `onStateChange(state, snapshot)`.
 
 ### States
 
