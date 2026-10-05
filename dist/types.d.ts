@@ -22,6 +22,22 @@ export interface Currency {
     address: string;
     chain_id: number;
 }
+/**
+ * The public pay-details response (what the wallet pay page reads for a
+ * fulfillment). The payer pays in MPP; the store settles in USDC through its
+ * router plan; request amounts stay in USDC minor units (6 dp).
+ */
+export interface PublicPayDetails {
+    /** USDC minor units (6 dp): the request amount, in the settlement token. */
+    notional_uoa: Uoa;
+    /** The token the PAYER sends: the MPP token address. Not the settlement token. */
+    input_token: string;
+    /** Decimals of `input_token` (18 for MPP). Not the 6 of USDC amounts. */
+    input_decimals: number;
+    /** The settlement token (USDC) the store receives. */
+    currency?: Currency;
+    [k: string]: unknown;
+}
 /** The states a checkout passes through. */
 export type CheckoutState = 'idle' | 'creating' | 'awaiting_payment' | 'settling' | 'paid' | 'expired' | 'cancelled' | 'error' | 'unconfirmed';
 /** Terminal states. Once here, polling has stopped for good. */

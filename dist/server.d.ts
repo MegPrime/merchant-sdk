@@ -60,6 +60,11 @@ export interface RefundProposal {
     /** The refund the OWNER pays, once they have approved. Absent before that,
      *  and on a proposal the payments core refused. */
     refundFulfillmentId?: string;
+    /** The wallet the refund goes to. For a sale created with a secret key this is
+     *  the platform refund wallet, NOT the on-chain payer: MegPrime settles with
+     *  the partner's users off-chain. Absent means the payer. Present on proposal
+     *  and approval responses. */
+    refundDestination?: string;
     /** Why it was rejected, or why raising it failed. */
     decisionReason?: string;
     decidedAt?: Date;
@@ -86,8 +91,9 @@ export declare function createPaymentRequest(o: CreatePaymentOptions): Promise<P
  * Ask the merchant to refund a payment you created.
  *
  * This QUEUES the refund: the store owner decides, and pays it themselves. Your
- * key cannot approve one, and cannot say where the money goes — the payments
- * core sends it back to whoever actually paid the original.
+ * key cannot approve one, and cannot say where the money goes — for a sale a
+ * secret key created, the payments core sends it to MegPrime's platform refund
+ * wallet (see `RefundProposal.refundDestination`), not the on-chain payer.
  *
  * Poll `getRefundProposal` for the answer.
  */

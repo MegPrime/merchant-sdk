@@ -129,8 +129,9 @@ export async function createPaymentRequest(o) {
  * Ask the merchant to refund a payment you created.
  *
  * This QUEUES the refund: the store owner decides, and pays it themselves. Your
- * key cannot approve one, and cannot say where the money goes — the payments
- * core sends it back to whoever actually paid the original.
+ * key cannot approve one, and cannot say where the money goes — for a sale a
+ * secret key created, the payments core sends it to MegPrime's platform refund
+ * wallet (see `RefundProposal.refundDestination`), not the on-chain payer.
  *
  * Poll `getRefundProposal` for the answer.
  */
@@ -162,6 +163,7 @@ function toProposal(d) {
         state: str(d.state) ?? 'proposed',
         amountUoa: str(d.amount_uoa) ?? '0',
         refundFulfillmentId: str(d.refund_fulfillment_id),
+        refundDestination: str(d.refund_destination),
         decisionReason: str(d.decision_reason),
         decidedAt: date(d.decided_at),
         createdAt: date(d.created_at),

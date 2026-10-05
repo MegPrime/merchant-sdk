@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.3.0
+npm install github:MegPrime/merchant-sdk#v0.4.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -113,6 +113,15 @@ The wallet link is for the test store only until MegPrime decides on KYC.
 resolves to nothing, which is worse than an error because it looks like it
 worked. Both functions refuse anything that is not a URL, and say why.
 
+### Tokens: payers pay MPP, stores receive USDC
+
+On the wallet pay link the **payer pays in MPP** (18 decimals), swapped through
+the Z5 router. The **store settles in USDC** through its router plan. **Request
+amounts stay USDC minor units (6 dp)**: `amountUoa` is always USDC, whatever the
+payer sends. The public pay-details response carries `input_token` (the MPP
+address) and `input_decimals` (18); the `PublicPayDetails` type has both. Never
+use `input_decimals` to scale `amountUoa`.
+
 ## Taking payments and refunds from your server
 
 The secret key (`msk_…`) lives on a server and nowhere else, so it has its own
@@ -147,8 +156,10 @@ const now = await getRefundProposal({ secretKey, proposalId: proposal.id });
 ```
 
 **Your key can ask for a refund. It cannot grant one**, and it never says where
-the money goes: MegPrime sends it back to whoever actually paid the original.
-The owner approves and pays it themselves. Watch an approved refund land with
+the money goes. For a sale created with a secret key the refund goes to the
+**platform refund wallet, not the on-chain payer**: MegPrime settles with your
+users off-chain. Proposal and approval responses include `refundDestination`
+(`refund_destination` on the wire); absent means the payer. The owner approves and pays it themselves. Watch an approved refund land with
 `getPaymentStatus(refundFulfillmentId)` — the same credential-free poll the
 browser uses.
 

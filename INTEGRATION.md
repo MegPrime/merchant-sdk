@@ -76,7 +76,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.3.0
+npm install github:MegPrime/merchant-sdk#v0.4.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -86,7 +86,7 @@ If the build environment can't fetch from GitHub over git, install the release
 tarball instead:
 
 ```bash
-npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.3.0/megprime-merchant-sdk-0.3.0.tgz
+npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.4.0/megprime-merchant-sdk-0.4.0.tgz
 ```
 
 The SDK runs in the browser. Your server needs no SDK, only HTTP.
@@ -152,6 +152,14 @@ gives minor units. **Don't trust that silently.** After creating the request,
 check that `data.currency.decimals` matches the scale you used. If it doesn't,
 refuse to show the checkout and log loudly. A price shown at the wrong scale
 is a wrong price.
+
+### Payer token vs settlement token
+
+The payer pays in **MPP** (18 decimals) through the Z5 router; the store
+settles in **USDC** through its router plan. Request amounts (`notional_uoa`,
+`amountUoa`) stay **USDC, 6 dp**. The public pay-details response adds
+`input_token` (the MPP address) and `input_decimals` (18), typed as
+`PublicPayDetails`. Never scale a request amount by `input_decimals`.
 
 ### Reference implementation: Supabase Edge Function (Lovable)
 
@@ -524,14 +532,18 @@ from `checkout.snapshot.payUrl` (app) or `checkout.snapshot.walletPayUrl` (any B
 
 ## 8. Refunds
 
-A refund sends a **settled** payment back to whoever paid it. Three rules shape
-the API:
+A refund returns a **settled** payment. For a sale your secret key created, the
+money goes to MegPrime's **platform refund wallet**, not the on-chain payer:
+MegPrime settles with your users off-chain. Three rules shape the API:
 
 - **Your key may ASK, never grant.** `proposeRefund` queues it; the **store
   owner** approves it in the MegPrime app and pays it from the store's
   settlement wallet.
-- **Nobody names a destination.** MegPrime reads it from the original payment,
-  so a refund cannot be pointed anywhere else.
+- **Nobody names a destination.** For a sale created with a secret key the
+  refund goes to the **platform refund wallet, not the on-chain payer**;
+  MegPrime settles with your users off-chain. Proposal and approval responses
+  include `refund_destination` (`refundDestination` in the SDK; absent means the
+  payer). Your key can only propose.
 - **Never more than arrived.** The limit is what actually settled, minus refunds
   already claimed. Over it, the owner's approval is refused and the proposal
   ends `failed` with the reason.
