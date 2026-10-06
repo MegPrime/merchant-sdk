@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.4.0
+npm install github:MegPrime/merchant-sdk#v0.5.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -150,18 +150,21 @@ const proposal = await proposeRefund({
 
 // the STORE OWNER decides. Poll for the answer
 const now = await getRefundProposal({ secretKey, proposalId: proposal.id });
-// 'proposed' → waiting on the owner
-// 'approved' → now.refundFulfillmentId is the refund they must pay
+// 'owed'     → approved (automatically at or under your key's limit, 100 USDC
+//              by default); MegPrime settles it with you OFF-CHAIN, by wire
+// 'wired'    → MegPrime has sent the wire
+// 'proposed' → over the limit: waiting on the owner
 // 'rejected' | 'failed' → now.decisionReason says why
 ```
 
-**Your key can ask for a refund. It cannot grant one**, and it never says where
-the money goes. For a sale created with a secret key the refund goes to the
-**platform refund wallet, not the on-chain payer**: MegPrime settles with your
-users off-chain. Proposal and approval responses include `refundDestination`
-(`refund_destination` on the wire); absent means the payer. The owner approves and pays it themselves. Watch an approved refund land with
-`getPaymentStatus(refundFulfillmentId)` — the same credential-free poll the
-browser uses.
+**Your key can ask for a refund, and it never says where the money goes.** For a
+sale your secret key created, a refund at or under the key's auto-refund limit
+(100 USDC per refund and 500 USDC per day by default; MegPrime sets them) comes
+back **`owed` straight away**; a larger one stays `proposed` until the store
+owner decides. Either way **nothing moves on-chain**: MegPrime settles refunds
+with you off-chain, by wire, and you settle with your own customer.
+`settlement` is `off_chain` and `autoApproved` is true when no person was
+involved. A refund can never exceed what the sale actually received.
 
 ## Headless
 

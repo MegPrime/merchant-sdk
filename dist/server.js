@@ -126,12 +126,14 @@ export async function createPaymentRequest(o) {
     });
 }
 /**
- * Ask the merchant to refund a payment you created.
+ * Ask for a refund of a payment you created.
  *
- * This QUEUES the refund: the store owner decides, and pays it themselves. Your
- * key cannot approve one, and cannot say where the money goes — for a sale a
- * secret key created, the payments core sends it to MegPrime's platform refund
- * wallet (see `RefundProposal.refundDestination`), not the on-chain payer.
+ * Your key cannot say where the money goes. For a sale a secret key created, a
+ * refund
+ * at or under the key's auto-refund limit (100 USDC by default, with a daily
+ * total) comes back `owed` at once; above it, it stays `proposed` for the owner.
+ * Either way MegPrime settles it with you OFF-CHAIN, by wire: nothing moves
+ * on-chain and there is no refund to pay or watch.
  *
  * Poll `getRefundProposal` for the answer.
  */
@@ -163,6 +165,8 @@ function toProposal(d) {
         state: str(d.state) ?? 'proposed',
         amountUoa: str(d.amount_uoa) ?? '0',
         refundFulfillmentId: str(d.refund_fulfillment_id),
+        settlement: str(d.settlement),
+        autoApproved: str(d.decided_by) === 'system:auto' ? true : undefined,
         refundDestination: str(d.refund_destination),
         decisionReason: str(d.decision_reason),
         decidedAt: date(d.decided_at),

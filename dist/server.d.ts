@@ -52,7 +52,18 @@ export interface PaymentRequest {
     /** The wallet link: any Base wallet holding USDC, no account. */
     walletPayUrl?: string;
 }
-export type RefundState = 'proposed' | 'approved' | 'rejected' | 'failed';
+/**
+ * - `proposed`: waiting on the store owner (over your key's auto-refund limit).
+ * - `owed`: approved, automatically (100 USDC or less by default) or by the
+ *   owner. MegPrime owes it and settles it with you OFF-CHAIN, by wire.
+ * - `wired`: MegPrime has sent the wire.
+ * - `approved`: an ON-CHAIN refund the owner must pay (not used for sales your
+ *   secret key created).
+ * - `rejected` | `failed`: see `decisionReason`.
+ */
+export type RefundState = 'proposed' | 'owed' | 'wired' | 'approved' | 'rejected' | 'failed';
+/** How the refund is settled. Sales your secret key created settle `off_chain`. */
+export type RefundSettlement = 'off_chain' | 'on_chain';
 export interface RefundProposal {
     id: string;
     state: RefundState;
@@ -60,10 +71,11 @@ export interface RefundProposal {
     /** The refund the OWNER pays, once they have approved. Absent before that,
      *  and on a proposal the payments core refused. */
     refundFulfillmentId?: string;
-    /** The wallet the refund goes to. For a sale created with a secret key this is
-     *  the platform refund wallet, NOT the on-chain payer: MegPrime settles with
-     *  the partner's users off-chain. Absent means the payer. Present on proposal
-     *  and approval responses. */
+    /** `off_chain` for sales your secret key created: MegPrime settles by wire. */
+    settlement?: RefundSettlement;
+    /** True when it was approved automatically, under your key's limit. */
+    autoApproved?: boolean;
+    /** Only for an on-chain refund: the wallet it goes to. */
     refundDestination?: string;
     /** Why it was rejected, or why raising it failed. */
     decisionReason?: string;
@@ -88,12 +100,14 @@ export interface ProposeRefundOptions extends ServerOptions {
  */
 export declare function createPaymentRequest(o: CreatePaymentOptions): Promise<PaymentRequest>;
 /**
- * Ask the merchant to refund a payment you created.
+ * Ask for a refund of a payment you created.
  *
- * This QUEUES the refund: the store owner decides, and pays it themselves. Your
- * key cannot approve one, and cannot say where the money goes — for a sale a
- * secret key created, the payments core sends it to MegPrime's platform refund
- * wallet (see `RefundProposal.refundDestination`), not the on-chain payer.
+ * Your key cannot say where the money goes. For a sale a secret key created, a
+ * refund
+ * at or under the key's auto-refund limit (100 USDC by default, with a daily
+ * total) comes back `owed` at once; above it, it stays `proposed` for the owner.
+ * Either way MegPrime settles it with you OFF-CHAIN, by wire: nothing moves
+ * on-chain and there is no refund to pay or watch.
  *
  * Poll `getRefundProposal` for the answer.
  */

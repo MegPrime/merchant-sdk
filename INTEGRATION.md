@@ -76,7 +76,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.4.0
+npm install github:MegPrime/merchant-sdk#v0.5.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -86,7 +86,7 @@ If the build environment can't fetch from GitHub over git, install the release
 tarball instead:
 
 ```bash
-npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.4.0/megprime-merchant-sdk-0.4.0.tgz
+npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.5.0/megprime-merchant-sdk-0.5.0.tgz
 ```
 
 The SDK runs in the browser. Your server needs no SDK, only HTTP.
@@ -532,58 +532,50 @@ from `checkout.snapshot.payUrl` (app) or `checkout.snapshot.walletPayUrl` (any B
 
 ## 8. Refunds
 
-A refund returns a **settled** payment. For a sale your secret key created, the
-money goes to MegPrime's **platform refund wallet**, not the on-chain payer:
-MegPrime settles with your users off-chain. Three rules shape the API:
+For a sale your secret key created, a refund is an entry in MegPrime's ledger,
+settled with **you, off-chain, by wire**. You then settle with your customer.
+Nothing moves on-chain and there is no refund payment to watch.
 
-- **Your key may ASK, never grant.** `proposeRefund` queues it; the **store
-  owner** approves it in the MegPrime app and pays it from the store's
-  settlement wallet.
-- **Nobody names a destination.** For a sale created with a secret key the
-  refund goes to the **platform refund wallet, not the on-chain payer**;
-  MegPrime settles with your users off-chain. Proposal and approval responses
-  include `refund_destination` (`refundDestination` in the SDK; absent means the
-  payer). Your key can only propose.
-- **Never more than arrived.** The limit is what actually settled, minus refunds
-  already claimed. Over it, the owner's approval is refused and the proposal
-  ends `failed` with the reason.
+- **At or under your key's auto-refund limit** (100 USDC per refund and 500 USDC
+  per UTC day by default; MegPrime sets them, your key cannot), the refund comes
+  back **`owed` immediately**: no person involved.
+- **Above it**, it stays **`proposed`** until the store owner approves (→ `owed`)
+  or rejects it.
+- **`wired`** means MegPrime has sent the wire.
+- **Nobody names a destination**, and a refund can **never exceed what the sale
+  actually received**, minus refunds already recorded (`422 refund_exceeds_paid`).
+- **Retries are safe:** the same `clientRef` returns the same refund, never a
+  second one.
 
 ```ts
-import { proposeRefund, getRefundProposal, getPaymentStatus }
+import { proposeRefund, getRefundProposal }
   from '@megprime/merchant-sdk/server';
 
 // 1. ask (server-side, from your own cancellation flow)
-const proposal = await proposeRefund({
+const refund = await proposeRefund({
   secretKey: Deno.env.get('MEGPRIME_SECRET_KEY')!,
   fulfillmentId: order.fulfillment_id,
   amountUoa: order.payment_amount_uoa,   // partial refunds are fine
   reason: 'Booking cancelled by the guest',
-  clientRef: refundDecisionId,           // a retry returns the SAME proposal
+  clientRef: refundDecisionId,           // a retry returns the SAME refund
 });
-// store proposal.id on the order
+// store refund.id on the order
 
-// 2. poll for the owner's decision
-const now = await getRefundProposal({ secretKey, proposalId: proposal.id });
+// 2. act on the state; poll getRefundProposal only while it is 'proposed'
+const now = refund.state === 'proposed'
+  ? await getRefundProposal({ secretKey, proposalId: refund.id })
+  : refund;
 switch (now.state) {
-  case 'proposed': break;                     // waiting on the merchant
-  case 'rejected': /* now.decisionReason */ break;
-  case 'failed':   /* now.decisionReason */ break;
-  case 'approved': {
-    // 3. the owner still has to PAY it. Watch the money actually move.
-    const s = await getPaymentStatus(now.refundFulfillmentId!);
-    if (s.status === 'confirmed' && BigInt(s.paidUoa) >= BigInt(now.amountUoa)) {
-      // the customer has their money back
-    }
-  }
+  case 'owed':     /* MegPrime owes you this amount; refund your customer */ break;
+  case 'wired':    /* the wire has been sent */ break;
+  case 'proposed': /* over the limit: waiting on the merchant */ break;
+  case 'rejected':
+  case 'failed':   /* now.decisionReason says why */ break;
 }
 ```
 
-**Do not tell the customer they have been refunded on `approved`.** That is the
-merchant agreeing to pay, not money moving. Wait for the refund's own payment to
-confirm, exactly as you waited for the sale.
-
-**Show the customer a QR only for a sale**, never for a refund: a refund is paid
-by the merchant, in their own app.
+**Show the customer a QR only for a sale**, never for a refund: refunds are
+settled with you by wire, not paid on-chain.
 
 ---
 
