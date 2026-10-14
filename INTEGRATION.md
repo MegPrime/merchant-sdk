@@ -43,10 +43,11 @@ it over:
 | `MEGPRIME_SECRET_KEY` | `msk_…` | server secret only |
 | `MEGPRIME_GATEWAY` | `https://api.megprimepay.com` | server config (optional, this is the default) |
 
-The key is **bound to one store** and can do exactly one thing: create payment
-requests that pay that store. It can't read payments, list anything, or
-choose a wallet. The merchant may also have set a maximum amount per request
-on it.
+The key is **bound to one store**. It can create payment requests that pay
+that store and read that store's requests back, propose refunds of its own
+sales, and manage the store's webhooks (section 9). It can't approve a refund,
+see another store, or choose a wallet. The merchant may also have set a
+maximum amount per request on it.
 
 If the key is missing, stop and ask the human for it. Don't invent a
 placeholder that looks like a real key.
@@ -76,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.5.0
+npm install github:MegPrime/merchant-sdk#v0.6.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -86,10 +87,12 @@ If the build environment can't fetch from GitHub over git, install the release
 tarball instead:
 
 ```bash
-npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.5.0/megprime-merchant-sdk-0.5.0.tgz
+npm install https://github.com/MegPrime/merchant-sdk/releases/download/v0.6.0/megprime-merchant-sdk-0.6.0.tgz
 ```
 
-The SDK runs in the browser. Your server needs no SDK, only HTTP.
+The SDK runs in the browser. Your server needs no SDK, only HTTP; the
+optional `@megprime/merchant-sdk/server` entry point wraps the same calls and
+verifies webhook signatures (section 9).
 
 ---
 
@@ -325,8 +328,10 @@ Show whichever fits the payer, or both as two QR codes
 
 ## 5. Server: confirm payment before releasing goods
 
-Webhooks don't exist yet. The status endpoint is public and needs no
-credential, so the server checks it directly:
+Whatever tells you a payment may have landed (the page's `onSuccess`, a
+`payment_request.paid` webhook (section 9), or a scheduled job), the server
+makes the final check itself. The status endpoint is public and needs no
+credential:
 
 ```
 GET {MEGPRIME_GATEWAY}/api/v1/enforcer/fulfillments/{fulfillment_id}/status
@@ -579,7 +584,317 @@ settled with you by wire, not paid on-chain.
 
 ---
 
-## 9. Done checklist
+## 9. Webhooks
+
+Webhooks tell your server the moment a payment or refund changes. Every route
+below is under `https://api.megprimepay.com/api/v1/mpmerchant`, authenticated by
+the store's secret key in `X-Secret-Key`, and scoped to that key's store
+(another store's endpoint or event is a 404, never a 403). All of it is
+server-side only.
+
+### Register an endpoint and store the secret
+
+```ts
+import { createWebhookEndpoint } from '@megprime/merchant-sdk/server';
+
+const ep = await createWebhookEndpoint({
+  secretKey: process.env.MEGPRIME_SECRET_KEY!,
+  url: 'https://shop.example/hooks/megprime',
+  description: 'production',            // optional, 500 characters or fewer
+});
+// ep.secret is the signing secret (whsec_…). It is returned ONCE, here, and
+// never again: write it straight into your server-side secret store as
+// MEGPRIME_WHSEC. Do not log it. Lost it? rotateWebhookSecret.
+```
+
+Raw HTTP: `POST /server/webhook-endpoints` with `{ "url": "…", "description": "…" }`
+returns `201` and `data.secret`.
+
+- The URL must be **https on port 443** and resolve to a **public** address
+  (`invalid_webhook_url` otherwise), 2048 characters or fewer.
+- At most **5 live endpoints** per store (`webhook_endpoint_limit`).
+- Every endpoint receives **every** event type. There is no per-endpoint filter:
+  ignore the types you don't need, and still answer them `2xx`.
+- `listWebhookEndpoints` (`GET /server/webhook-endpoints`) shows `enabled`,
+  `disabledReason` and `consecutiveFailures`. It never returns a secret.
+- `deleteWebhookEndpoint` (`DELETE /server/webhook-endpoints/{id}`) stops
+  delivery; deliveries still pending for it fail without retry.
+
+### Verify every delivery
+
+Each delivery is a `POST` with `Content-Type: application/json` and these
+headers:
+
+| header | value |
+|---|---|
+| `X-MegPrime-Signature` | `t=<unix>,v1=<hex>`, and one more `v1=` per extra live secret during a rotation |
+| `X-MegPrime-Event-Id` | `evt_…`, same as the body's `id` |
+| `X-MegPrime-Event-Type` | the event type |
+| `X-MegPrime-Delivery-Id` | per endpoint; not a dedupe key |
+| `User-Agent` | `MegPrime-Webhooks/1` |
+
+`v1` is `hex(HMAC-SHA256(secret, "<t>.<raw body>"))`. The key is the **whole**
+`whsec_…` string as UTF-8, prefix included; don't decode it.
+
+`verifyWebhook(rawBody, signatureHeader, secrets, { toleranceSeconds })` from
+`@megprime/merchant-sdk/server` checks it and returns the parsed event:
+
+- **Pass the raw body**: the exact bytes received, as a `Buffer`, `Uint8Array`,
+  `ArrayBuffer` or string. If a JSON body parser runs first, re-serialising
+  changes whitespace and key order and the signature won't match. Passing a
+  parsed object throws a `TypeError`, a bug in your route rather than a bad
+  delivery.
+- `secrets` is one secret or an array. **Any `v1` matching any secret passes**,
+  which is how a rotation overlap works.
+- A timestamp more than `toleranceSeconds` (default **300**) from your clock,
+  **in the past or the future**, is refused. Keep your server clock on NTP.
+- MACs are compared in constant time.
+- A failure throws `WebhookSignatureError` with `code`:
+  `malformed` (missing header, a segment without `=`, no or repeated `t`, a `v1`
+  that isn't 64 hex, a body that isn't JSON), `stale` (outside the tolerance) or
+  `no_match`. **Answer `400` and do nothing.** Unknown schemes such as `v0=` are
+  ignored.
+
+**Node / Express.** Put `express.raw` on the webhook route, before any global
+`express.json()` reaches it:
+
+```ts
+import express from 'express';
+import { verifyWebhook, WebhookSignatureError, type WebhookEvent } from '@megprime/merchant-sdk/server';
+
+const app = express();
+const secrets = [process.env.MEGPRIME_WHSEC!, process.env.MEGPRIME_WHSEC_PREVIOUS].filter(Boolean) as string[];
+
+app.post('/hooks/megprime', express.raw({ type: 'application/json' }), (req, res) => {
+  let event: WebhookEvent;
+  try {
+    event = verifyWebhook(req.body, req.headers['x-megprime-signature'], secrets);  // req.body is a Buffer
+  } catch (e) {
+    if (e instanceof WebhookSignatureError) return res.sendStatus(400);
+    throw e;
+  }
+  // Insert event.id into a table with a UNIQUE constraint. A duplicate means
+  // you already have it: still answer 2xx. Queue the work and return now.
+  enqueue(event);
+  res.sendStatus(204);
+});
+
+app.use(express.json()); // other routes, AFTER the webhook route
+```
+
+**Framework-agnostic (fetch `Request`: Next.js route handlers, Hono, Bun, Deno,
+Supabase Edge Functions, Cloudflare Workers with `nodejs_compat`):**
+
+```ts
+import { verifyWebhook, WebhookSignatureError } from '@megprime/merchant-sdk/server';
+
+export async function handleMegPrimeWebhook(req: Request): Promise<Response> {
+  const raw = new Uint8Array(await req.arrayBuffer());   // bytes, not req.json()
+  let event;
+  try {
+    event = verifyWebhook(raw, req.headers.get('x-megprime-signature'), [MEGPRIME_WHSEC]);
+  } catch (e) {
+    if (e instanceof WebhookSignatureError) return new Response('bad signature', { status: 400 });
+    throw e;
+  }
+  await recordOnce(event.id, event);                     // dedupe, then queue
+  return new Response(null, { status: 204 });
+}
+```
+
+**Without the SDK (Web Crypto, any runtime).** `crypto.subtle.verify` compares
+in constant time:
+
+```ts
+async function verifyMegPrime(raw: Uint8Array, header: string | null, secrets: string[], toleranceSec = 300) {
+  const parts = (header ?? '').split(',').map((p) => p.trim().split('='));
+  const ts = parts.filter(([k]) => k === 't').map(([, v]) => v);
+  const v1 = parts.filter(([k]) => k === 'v1').map(([, v]) => v).filter((h) => /^[0-9a-f]{64}$/i.test(h));
+  if (ts.length !== 1 || !/^\d+$/.test(ts[0]) || v1.length === 0) return false;
+  if (Math.abs(Date.now() / 1000 - Number(ts[0])) > toleranceSec) return false;
+  const signed = new Uint8Array([...new TextEncoder().encode(`${ts[0]}.`), ...raw]);
+  for (const s of secrets) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(s), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    for (const h of v1) {
+      const mac = Uint8Array.from(h.match(/../g)!, (b) => parseInt(b, 16));
+      if (await crypto.subtle.verify('HMAC', key, mac, signed)) return true;
+    }
+  }
+  return false;
+}
+```
+
+Supabase: deploy the receiving function with `--no-verify-jwt`. MegPrime sends
+no `Authorization` header; the signature is the authentication.
+
+### Events and payload
+
+Every body has this envelope. It's the same object `listEvents` returns:
+
+```json
+{
+  "id": "evt_0123456789abcdef0123456789abcdef",
+  "type": "payment_request.paid",
+  "created_at": "2026-10-12T22:00:00Z",
+  "api_version": "2026-10-12",
+  "data": { "object": { "…": "the payment request or refund, snake_case" } }
+}
+```
+
+`id` is stable across retries and redeliveries: **dedupe on it**. Delivery is
+at-least-once and **not ordered**, so act on the object's own `status`/`state`
+and timestamps, not on arrival order. `data.object` is the resource as it was
+when the event was cut, in the wire's snake_case (types: `PaymentRequestEvent`,
+`RefundEvent`, `WebhookTestEvent`; `WEBHOOK_EVENT_TYPES` lists them all). Treat
+an unknown `type` as "ignore and answer 2xx": new types can be added.
+
+| type | when | `data.object` |
+|---|---|---|
+| `payment_request.paid` | the payments core reports the sale confirmed or settled | payment request + `tx_hash` |
+| `payment_request.failed` | upstream status became `failed`, `expired`, `cancelled` or `declined` (see `status`) | payment request |
+| `payment_request.expired` | 60s past `deadline` and still unpaid | payment request |
+| `payment_request.voided` | store staff voided it in the MegPrime app (`voided_at`) | payment request |
+| `refund.proposed` | a refund over your key's auto-refund limit is waiting on the owner | refund |
+| `refund.owed` | approved, automatically (`decided_by: "system:auto"`) or by the owner. MegPrime owes it and settles by wire | refund |
+| `refund.rejected` | the owner rejected it (`decision_reason`) | refund |
+| `refund.wired` | MegPrime sent the wire (`wired_at`). **This is the money moving** | refund |
+| `refund.failed` | an on-chain refund the payments core refused (`decision_reason`); not used for secret-key sales | refund |
+| `webhook.test` | you called `sendTestWebhook` | `{ "endpoint_id": "…" }` |
+
+**Payment request object:** `id` (request id), `fulfillment_id`, `store_id`,
+`terminal_id`, `client_ref`, `notional_uoa` (minor units, string), `currency`
+(`symbol`, `decimals`, `address`, `chain_id`), `memo`, `reference`,
+`receiver_wallet`, `request_token`, `chain_id`, `device_paired`, `deadline`,
+`status` (the payments core's last status, not normalised: lowercase it),
+`status_at`, `settled_at`, `voided_at`, `created_at`, `updated_at`; plus
+`tx_hash` on `payment_request.paid`. Match it to your order by `client_ref` or
+`fulfillment_id`.
+
+**`payment_request.paid` is not proof of the amount.** It fires on the upstream
+status, and the object has no `paid_sum`. Before releasing goods, call
+`getPaymentStatus(fulfillment_id)` and require `paidUoa >= amountUoa`, as in
+section 5. A webhook replaces your polling *trigger*, not
+that check. Payment events come from a sweeper that runs about every 10s, so
+expect a few seconds of lag after the chain.
+
+**Refund object:** `id`, `request_id` (the sale's request id), `store_id`,
+`amount_uoa`, `reason`, `state`, `settlement` (`off_chain` for secret-key
+sales), `client_ref`, `decided_by`, `decided_at`, `decision_reason`,
+`wired_at`, `refund_fulfillment_id`, `refund_destination`,
+`proposed_by_key_id`, `created_at`, `updated_at`. Finance's wire reference is
+never included.
+
+### Retries and auto-disable
+
+- A delivery succeeds on any **2xx** within **10 seconds**. Redirects are not
+  followed. Anything else, including a timeout or a 3xx, is a failed attempt.
+  Answer fast and do the work afterwards.
+- A failed delivery is retried with backoff, **12 attempts in all**. The waits
+  after each failure are 30s, 2m, 10m, 30m, 1h, 2h, 4h, 8h, 12h, 12h, 12h, so
+  the last attempt is about **52 hours** after the first. After the 12th the
+  delivery is `failed`.
+- Each delivery that ends `failed` adds one to the endpoint's
+  `consecutiveFailures`; any success resets it to 0. At **10 consecutive failed
+  deliveries** the endpoint is **disabled**, with
+  `disabledReason: "auto-disabled after 10 consecutive failed deliveries"`.
+- While an endpoint is disabled, new events are **not queued** for it and its
+  pending deliveries fail at once. They aren't lost: they're in `listEvents`.
+
+### Re-enable
+
+Fix the receiver first, or it will disable again. Then:
+
+```ts
+await enableWebhookEndpoint({ secretKey, endpointId });  // POST /server/webhook-endpoints/{id}/enable
+await sendTestWebhook({ secretKey, endpointId });         // check it end to end
+// then gap-fill (below) from the last event you processed
+```
+
+`enable` clears `disabledReason` and resets `consecutiveFailures` to 0.
+
+### Rotate the secret (24h overlap)
+
+```ts
+const { secret } = await rotateWebhookSecret({ secretKey, endpointId });
+// POST /server/webhook-endpoints/{id}/rotate-secret: the new whsec_, ONCE
+```
+
+The **previous secret keeps working for 24 hours**. During that window every
+delivery is signed with **both**, so the header carries two `v1=` values. A
+receiver still on the old secret keeps verifying, and so does one already on
+the new secret. To roll over:
+
+1. Rotate and store the new secret as `MEGPRIME_WHSEC`, keeping the old one as
+   `MEGPRIME_WHSEC_PREVIOUS`.
+2. Deploy with `verifyWebhook(raw, sig, [MEGPRIME_WHSEC, MEGPRIME_WHSEC_PREVIOUS])`.
+3. Remove the old secret any time after; it stops working 24h after the rotation.
+
+Only the most recent previous secret is kept, so rotating again inside the 24h
+ends the earlier overlap at once. That is also how to cut off a **leaked**
+secret immediately: rotate **twice**. The leaked secret is dropped, and the
+overlap runs on the intermediate one, which never left your hands.
+
+### Gap filling: `GET /server/events?after=`
+
+After downtime, or as a periodic safety net, page through what you may have
+missed. Events come **oldest first**, strictly after the event id you pass;
+`limit` is 1 to 100 (default 50). An `after` that isn't one of your store's
+event ids is `webhook_event_not_found`.
+
+```ts
+import { listEvents } from '@megprime/merchant-sdk/server';
+
+let after = await loadCursor();            // an evt_… you have processed, or undefined for the start
+for (;;) {
+  const page = await listEvents({ secretKey, after, limit: 100 });
+  for (const event of page.events) await handleOnce(event);   // same dedupe as the webhook route
+  after = page.nextAfter;
+  await saveCursor(after);
+  if (!page.mayHaveMore) break;
+}
+```
+
+The feed holds the exact payloads that were (or will be) delivered, including
+`webhook.test` events. Events are ordered by the time they were *cut*, which is
+inside the transaction that caused them, so one can land just behind a cursor
+you have already passed. Re-read from an event a few minutes old rather than
+from the very latest, and let dedupe absorb the overlap.
+
+### Redeliver one event
+
+```ts
+const { queued } = await redeliverEvent({ secretKey, eventId: 'evt_…' });
+// POST /server/events/{id}/redeliver: 202, data.queued = endpoints it was queued for
+```
+
+This resets (or creates) a pending delivery of that event for **every enabled
+endpoint** of the store, sent on the worker's next tick with a fresh signature
+and the full retry schedule. `queued: 0` means no endpoint is enabled.
+
+### Test events
+
+`sendTestWebhook({ secretKey, endpointId })` (`POST
+/server/webhook-endpoints/{id}/test`, `202`) queues a `webhook.test` event to
+that one endpoint only. It's signed and retried like any other. The response
+carries no event id; the delivery and `listEvents` do. Use it after creating,
+rotating or re-enabling an endpoint.
+
+### Errors from these routes
+
+| code | status | meaning |
+|---|---|---|
+| `invalid_webhook_url` | 400 | not https:443, not public, or too long |
+| `webhook_endpoint_limit` | 422 | 5 live endpoints already |
+| `webhook_endpoint_not_found` | 404 | no live endpoint with that id on this store |
+| `webhook_event_not_found` | 404 | no event with that id (or `after`) on this store |
+| `payment_request_not_found` | 404 | `getPaymentRequest`: not this store's request |
+| `invalid_body` | 400 | bad body or query (e.g. `limit` outside 1..100) |
+| `webhooks_unavailable` | 503 | webhooks are switched off server-side; retryable |
+| `publishable_key_invalid` | 401 | the secret key is unknown, revoked or malformed |
+
+---
+
+## 10. Done checklist
 
 - [ ] `grep -r "msk_" src/` and the built client bundle find nothing
 - [ ] The secret key is read only from a server-side secret
@@ -591,4 +906,7 @@ settled with you by wire, not paid on-chain.
 - [ ] A background job confirms orders left in `awaiting_payment`
 - [ ] `expired` gets a "start again" action, not an error screen
 - [ ] The order total is shown in your own UI
-- [ ] Refunds (if used): proposed server-side, never marked refunded until the refund's own payment confirms
+- [ ] Refunds (if used): proposed server-side; your customer is refunded on `owed`/`wired` (settled with you by wire), never on `proposed`
+- [ ] Webhooks (if used): the `whsec_` secret is stored server-side only; the route verifies the RAW body against `X-MegPrime-Signature`; event ids are deduped with a unique constraint; 2xx is returned within 10s and the work is queued
+- [ ] Webhooks (if used): `payment_request.paid` triggers the section 5 check (`paid_sum`), it doesn't replace it
+- [ ] Webhooks (if used): a gap-fill job pages `listEvents` from a stored cursor, and an auto-disabled endpoint has a re-enable path

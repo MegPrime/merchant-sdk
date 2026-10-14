@@ -62,6 +62,23 @@ export type CheckoutErrorCode =
  | 'embedded_payments_unavailable'
 /** Too many requests from this key or this address. */
  | 'rate_limited'
+/** Secret-key routes: no payment request with that id on this key's store
+ *  (another store's request is also this, never a 403). */
+ | 'payment_request_not_found'
+/** Webhooks are switched off on the server (no keyring). Nothing was created. */
+ | 'webhooks_unavailable'
+/** The endpoint URL was refused: it must be https, port 443, a public host,
+ *  2048 characters or fewer. */
+ | 'invalid_webhook_url'
+/** The store already has 5 live webhook endpoints. Delete one first. */
+ | 'webhook_endpoint_limit'
+/** No live endpoint with that id on this key's store. */
+ | 'webhook_endpoint_not_found'
+/** No event with that id on this key's store (also the `after` cursor of
+ *  `listEvents`). */
+ | 'webhook_event_not_found'
+/** The server refused the body or query (e.g. `limit` outside 1..100). */
+ | 'invalid_body'
 /** The request never reached the gateway, or the gateway never answered. */
  | 'network'
 /** The SDK refused the options it was handed, before any request. */

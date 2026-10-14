@@ -9,6 +9,7 @@ const RETRYABLE = new Set([
     'network',
     'rate_limited',
     'embedded_payments_unavailable',
+    'webhooks_unavailable',
     'unknown',
 ]);
 export function makeError(code, message, status) {
@@ -35,6 +36,7 @@ export function errorFromResponse(status, body) {
         (typeof b.error === 'string' && b.error) ||
         undefined;
     const message = (typeof b.message === 'string' && b.message) ||
+        (typeof b.detail === 'string' && b.detail) ||
         serverCode ||
         `request failed with status ${status}`;
     const known = [
@@ -43,6 +45,13 @@ export function errorFromResponse(status, body) {
         'price_over_key_cap',
         'embedded_payments_unavailable',
         'rate_limited',
+        'payment_request_not_found',
+        'webhooks_unavailable',
+        'invalid_webhook_url',
+        'webhook_endpoint_limit',
+        'webhook_endpoint_not_found',
+        'webhook_event_not_found',
+        'invalid_body',
     ];
     if (serverCode && known.includes(serverCode)) {
         return makeError(serverCode, message, status);
