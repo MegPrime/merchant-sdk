@@ -1,4 +1,5 @@
 import { type CheckoutOptions, type CheckoutSnapshot } from './types.js';
+import { type MppDepositInstructions, type MppDepositIntent } from './mpp.js';
 export declare class Checkout {
     private opts;
     private snap;
@@ -41,6 +42,30 @@ export declare class Checkout {
     cancel(reason?: 'merchant' | 'abandoned'): void;
     /** Release every timer and listener. Idempotent. */
     destroy(): void;
+    /**
+     * Pay from an exchange: ask for an MPP deposit address and the exact amount.
+     *
+     * Works in created and attached mode alike; holding the fulfillment id is
+     * enough, no key is sent. It does not change how paid is detected: the
+     * status polling flips to `paid` when the fulfillment confirms. Rejects with
+     * a CheckoutError (`invalid_options` for a bad refund address, before any
+     * request; the gateway's code otherwise).
+     */
+    createMppDepositIntent(o: {
+        refundAddress: string;
+    }): Promise<MppDepositInstructions>;
+    /** Read back the deposit intent `createMppDepositIntent` issued. */
+    getMppDepositIntent(): Promise<MppDepositIntent>;
+    /**
+     * Resume this payer's deposit intent by their refund address (read-only;
+     * never creates one). 404 `mpp_deposit_intent_not_found` when they have none.
+     */
+    resumeMppDepositIntent(o: {
+        refundAddress: string;
+    }): Promise<MppDepositIntent>;
+    private mppIntentId;
+    private requireFulfillmentId;
+    private mppFetch;
     private gateway;
     /** Refuse locally what the server would refuse anyway, to save a round trip
      *  and to give a developer the error at the call site. */

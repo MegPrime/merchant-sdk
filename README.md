@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.6.0
+npm install github:MegPrime/merchant-sdk#v0.7.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -121,6 +121,61 @@ amounts stay USDC minor units (6 dp)**: `amountUoa` is always USDC, whatever the
 payer sends. The public pay-details response carries `input_token` (the MPP
 address) and `input_decimals` (18); the `PublicPayDetails` type has both. Never
 use `input_decimals` to scale `amountUoa`.
+
+## Pay from an exchange
+
+An exchange cannot sign a transaction. It can only send tokens to an address. For
+a payer whose MPP is on an exchange, ask for a deposit address and the exact
+amount to send there:
+
+```ts
+const ins = await checkout.createMppDepositIntent({ refundAddress: '0x…' });
+// ins.sendTo           deposit address
+// ins.amountToSend     "14080296915726607"  (18-dp base units, a STRING)
+// ins.amountToSendMpp  "0.014080296915726607" (every digit, no rounding)
+// ins.expiresAt, ins.warning
+
+import { mppDepositQrSvg, mppTransferUri } from '@megprime/merchant-sdk/qr';
+const svg = await mppDepositQrSvg(ins.sendTo, ins.amountToSend);
+// mppTransferUri(...) = ethereum:0x6E02F4A1631379a49e8B7E222CfA6Bf913b05E89@8453/transfer?address=<sendTo>&uint256=<amount>
+
+const intent = await checkout.getMppDepositIntent();
+// intent.state (awaiting | received | underpaid | overpaid | settling | settled | refunded | parked),
+// intent.receivedAmount, intent.expiresAt
+```
+
+A payer who comes back (new tab) with the same refund address gets the same
+deposit address back, without creating a new one:
+
+```ts
+const intent = await checkout.resumeMppDepositIntent({ refundAddress: '0x…' });
+// rejects with code 'mpp_deposit_intent_not_found' (404) when this refund
+// address has no intent on this request yet: call createMppDepositIntent.
+```
+
+This works on a `createCheckout` checkout once it is `awaiting_payment`, and on an
+`attachCheckout` checkout straight away. Holding the fulfillment id is enough,
+and no key is sent. A server can raise the same intent with
+`createMppDepositIntent(fulfillmentId, { secretKey, refundAddress })` from
+`@megprime/merchant-sdk/server`.
+
+Paid detection does not change. The checkout's status polling moves to `paid`
+when the fulfillment confirms. Do not treat `intent.state` as the paid signal.
+
+`refundAddress` is checked before any request is sent. It must be `0x` followed
+by 40 hex characters, and it cannot be the zero address. Amounts are always
+decimal strings. Never pass them through `Number`.
+
+Show the payer all three warnings:
+
+1. **Base only, MPP only.** Send MPP on the Base network. Another token, or MPP
+   on another network, will not settle this payment.
+2. **The exact amount.** Send exactly `amountToSendMpp` before `expiresAt`. Any
+   extra is refunded to `refundAddress`. A short or late payment is refunded
+   there too and does not pay.
+3. **Refunds go to `refundAddress`.** An exchange deposit address may not
+   credit a refund sent to it. Use an address you control, such as a self-custody
+   wallet.
 
 ## Webhooks
 
@@ -531,6 +586,7 @@ Branch on `err.code`, never on `err.message`.
 | `invalid_options` | no | the SDK refused your options before any request |
 | `payment_request_not_found` | no | secret-key lookup: not this store's request |
 | `webhooks_unavailable` | yes | webhooks are switched off server-side |
+| `mpp_deposit_intent_not_found` | no | pay from an exchange: no such intent on this request (on `resumeMppDepositIntent`: this refund address has none yet) |
 | `invalid_webhook_url`, `webhook_endpoint_limit`, `webhook_endpoint_not_found`, `webhook_event_not_found`, `invalid_body` | no | see [Webhooks](#webhooks) |
 
 ## Money

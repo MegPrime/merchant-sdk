@@ -1,9 +1,12 @@
 import { type QrOptions } from './qr.js';
 import type { CheckoutOptions, CheckoutSnapshot } from './types.js';
+import type { MppDepositMethods } from './mpp.js';
 export * from './types.js';
 export { formatUoa } from './money.js';
-export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, QrInputError, type QrOptions } from './qr.js';
-export interface CheckoutHandle {
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError, type QrOptions } from './qr.js';
+export * from './mpp.js';
+/** A running checkout. The pay-from-an-exchange methods come from MppDepositMethods (mpp.ts). */
+export interface CheckoutHandle extends MppDepositMethods {
     start(): Promise<CheckoutSnapshot>;
     /**
      * Stop the checkout.

@@ -112,6 +112,42 @@ export function walletQrSvg(fulfillmentId, options) {
 export function walletQrDataUrl(fulfillmentId, options) {
     return toQrDataUrl(walletPayUrlFor(fulfillmentId), options);
 }
+// ---------------------------------------------------------------------------
+// Pay from an exchange: the MPP transfer QR.
+//
+// Unlike every code above, this one is not a payUrl. It is an EIP-681 token
+// transfer a wallet can execute directly: MPP, on Base (8453), to the deposit
+// address, for the exact base-unit amount. The amount is a decimal string and
+// is encoded verbatim; a Number would round it.
+const MPP_TOKEN = '0x6E02F4A1631379a49e8B7E222CfA6Bf913b05E89';
+const BASE_CHAIN = 8453;
+/**
+ * `ethereum:<MPP>@8453/transfer?address=<sendTo>&uint256=<amountBaseUnits>`.
+ * Throws QrInputError on a malformed address or a non-integer amount.
+ */
+export function mppTransferUri(sendTo, amountBaseUnits) {
+    const to = String(sendTo ?? '').trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(to) || /^0x0{40}$/.test(to)) {
+        throw new QrInputError('sendTo must be a non-zero 0x address (the deposit address from createMppDepositIntent)');
+    }
+    const amt = String(amountBaseUnits ?? '').trim();
+    if (typeof amountBaseUnits !== 'string' || !/^\d+$/.test(amt) || /^0+$/.test(amt)) {
+        throw new QrInputError('amountBaseUnits must be a positive decimal string of 18-dp base units (amountToSend), never a Number');
+    }
+    return `ethereum:${MPP_TOKEN}@${BASE_CHAIN}/transfer?address=${to}&uint256=${amt}`;
+}
+/** SVG QR of the MPP transfer. Uses the same renderer and options as the codes above. */
+export async function mppDepositQrSvg(sendTo, amountBaseUnits, options) {
+    const uri = mppTransferUri(sendTo, amountBaseUnits);
+    const qrcode = await import('qrcode');
+    return qrcode.toString(uri, { ...opts(options), type: 'svg' });
+}
+/** PNG data-URL QR of the MPP transfer. */
+export async function mppDepositQrDataUrl(sendTo, amountBaseUnits, options) {
+    const uri = mppTransferUri(sendTo, amountBaseUnits);
+    const qrcode = await import('qrcode');
+    return qrcode.toDataURL(uri, opts(options));
+}
 /** SVG QR of the app link for a fulfillment id. */
 export function appQrSvg(fulfillmentId, options) {
     return toQrSvg(payUrlFor(fulfillmentId), options);

@@ -2,6 +2,7 @@ import { isTerminal, } from './types.js';
 import { errorFromResponse, makeError } from './errors.js';
 import { uuid } from './uuid.js';
 import { walletPayUrlFor } from './qr.js';
+import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
 const DEFAULT_GATEWAY = 'https://api.megprimepay.com';
 const DEFAULT_PAY_ORIGIN = 'https://app.megprimepay.com';
 const MAX_MEMO = 200;
@@ -177,7 +178,68 @@ export class Checkout {
         if (wasLive)
             this.cancel('abandoned');
     }
-    // -- internals ----------------------------------------------------------
+    /**
+     * Pay from an exchange: ask for an MPP deposit address and the exact amount.
+     *
+     * Works in created and attached mode alike; holding the fulfillment id is
+     * enough, no key is sent. It does not change how paid is detected: the
+     * status polling flips to `paid` when the fulfillment confirms. Rejects with
+     * a CheckoutError (`invalid_options` for a bad refund address, before any
+     * request; the gateway's code otherwise).
+     */
+    async createMppDepositIntent(o) {
+        const refund = assertRefundAddress(o?.refundAddress);
+        const id = this.requireFulfillmentId();
+        const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refund_address: refund }),
+        });
+        const intent = toMppDepositIntent(res);
+        this.mppIntentId = intent.intentId || undefined;
+        return intent.instructions;
+    }
+    /** Read back the deposit intent `createMppDepositIntent` issued. */
+    async getMppDepositIntent() {
+        const id = this.requireFulfillmentId();
+        if (!this.mppIntentId) {
+            throw makeError('invalid_options', 'no MPP deposit intent yet: call createMppDepositIntent first');
+        }
+        const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}?intent_id=${encodeURIComponent(this.mppIntentId)}`, { method: 'GET' });
+        return toMppDepositIntent(res);
+    }
+    /**
+     * Resume this payer's deposit intent by their refund address (read-only;
+     * never creates one). 404 `mpp_deposit_intent_not_found` when they have none.
+     */
+    async resumeMppDepositIntent(o) {
+        const refund = assertRefundAddress(o?.refundAddress);
+        const id = this.requireFulfillmentId();
+        const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}?refund_address=${encodeURIComponent(refund)}`, { method: 'GET' });
+        const intent = toMppDepositIntent(res);
+        this.mppIntentId = intent.intentId || undefined;
+        return intent;
+    }
+    requireFulfillmentId() {
+        const id = this.snap.fulfillmentId ?? this.attachTo;
+        if (!id) {
+            throw makeError('invalid_options', 'no fulfillment yet: wait for awaiting_payment before paying from an exchange');
+        }
+        return id;
+    }
+    async mppFetch(url, init) {
+        let res;
+        try {
+            res = await fetch(url, init);
+        }
+        catch (e) {
+            throw makeError('network', e instanceof Error ? e.message : 'network error');
+        }
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok)
+            throw errorFromResponse(res.status, body);
+        return (body.data ?? {});
+    }
     gateway() {
         return (this.opts.gateway || DEFAULT_GATEWAY).replace(/\/+$/, '');
     }

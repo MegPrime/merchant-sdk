@@ -82,6 +82,15 @@ export declare function walletPayUrlFor(fulfillmentId: string, origin?: string):
 export declare function walletQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
 /** PNG data-URL QR of the wallet link for a fulfillment id. */
 export declare function walletQrDataUrl(fulfillmentId: string, options?: QrOptions): Promise<string>;
+/**
+ * `ethereum:<MPP>@8453/transfer?address=<sendTo>&uint256=<amountBaseUnits>`.
+ * Throws QrInputError on a malformed address or a non-integer amount.
+ */
+export declare function mppTransferUri(sendTo: string, amountBaseUnits: string): string;
+/** SVG QR of the MPP transfer. Uses the same renderer and options as the codes above. */
+export declare function mppDepositQrSvg(sendTo: string, amountBaseUnits: string, options?: QrOptions): Promise<string>;
+/** PNG data-URL QR of the MPP transfer. */
+export declare function mppDepositQrDataUrl(sendTo: string, amountBaseUnits: string, options?: QrOptions): Promise<string>;
 /** SVG QR of the app link for a fulfillment id. */
 export declare function appQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
 /** PNG data-URL QR of the app link for a fulfillment id. */

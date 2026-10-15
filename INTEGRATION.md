@@ -77,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.6.0
+npm install github:MegPrime/merchant-sdk#v0.7.0
 ```
 
 No registry account or token is needed. The package still installs as

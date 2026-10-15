@@ -30,6 +30,8 @@
 import { Buffer } from 'node:buffer';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { errorFromResponse, makeError } from './errors.js';
+import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
+export { formatMppBaseUnits, MPP_TOKEN_ADDRESS, BASE_CHAIN_ID, MPP_DECIMALS } from './mpp.js';
 const DEFAULT_GATEWAY = 'https://api.megprimepay.com';
 /**
  * Refuse to run in a browser.
@@ -218,6 +220,22 @@ export async function getPaymentStatus(fulfillmentId, o) {
     finally {
         clearTimeout(timer);
     }
+}
+/**
+ * Pay from an exchange, raised by your server: an MPP deposit address and the
+ * EXACT amount to send there on Base, for a fulfillment you hold.
+ *
+ * Idempotent per request: a repeat returns the same intent. Paid detection is
+ * unchanged: watch `getPaymentStatus` (or the webhook) for the fulfillment to
+ * confirm. `refundAddress` is checked locally (0x + 40 hex, non-zero) before
+ * the request; anything the forwarder cannot route is returned there.
+ */
+export async function createMppDepositIntent(fulfillmentId, o) {
+    const refund = assertRefundAddress(o?.refundAddress);
+    const id = fulfillmentId?.trim();
+    if (!id)
+        throw makeError('invalid_options', 'fulfillmentId is required');
+    return call(mppDepositIntentPath(id), 'POST', o, { refund_address: refund }, (d) => toMppDepositIntent(d).instructions);
 }
 // ---------------------------------------------------------------------------
 // Webhooks
@@ -510,6 +528,6 @@ export async function getPaymentRequest(o) {
 export const getPayRequest = getPaymentRequest;
 // Re-exported from qr.ts so a server rendering a receipt does not need a second
 // import path. Drawing a QR needs no credential.
-export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, QrInputError } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError } from './qr.js';
 import { payUrlFor as payUrlForId, walletPayUrlFor as walletPayUrlForId } from './qr.js';
 export { formatUoa } from './money.js';

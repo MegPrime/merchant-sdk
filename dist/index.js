@@ -40,7 +40,10 @@ export * from './types.js';
 export { formatUoa } from './money.js';
 // Drawing a QR is an API, not something only the bundled widget may do. See
 // qr.ts: the rule is that the thing to encode is `payUrl`, never an id.
-export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, QrInputError } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError } from './qr.js';
+// Pay from an exchange: an MPP deposit address, its exact amount, and the
+// EIP-681 transfer QR. See mpp.ts and qr.ts.
+export * from './mpp.js';
 /**
  * Create a checkout.
  *
@@ -104,6 +107,9 @@ function build(opts) {
         start: () => checkout.start(),
         qrDataUrl: (options) => toQrDataUrl(checkout.snapshot.payUrl ?? '', options),
         qrSvg: (options) => toQrSvg(checkout.snapshot.payUrl ?? '', options),
+        createMppDepositIntent: (o) => checkout.createMppDepositIntent(o),
+        getMppDepositIntent: () => checkout.getMppDepositIntent(),
+        resumeMppDepositIntent: (o) => checkout.resumeMppDepositIntent(o),
         cancel: () => checkout.cancel('merchant'),
         destroy: () => {
             checkout.destroy();

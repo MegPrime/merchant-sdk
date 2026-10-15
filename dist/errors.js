@@ -52,6 +52,7 @@ export function errorFromResponse(status, body) {
         'webhook_endpoint_not_found',
         'webhook_event_not_found',
         'invalid_body',
+        'mpp_deposit_intent_not_found',
     ];
     if (serverCode && known.includes(serverCode)) {
         return makeError(serverCode, message, status);

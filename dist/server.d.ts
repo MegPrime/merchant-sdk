@@ -28,6 +28,9 @@
  * runs on the same server and uses node:crypto.
  */
 import type { Currency, Uoa } from './types.js';
+import { type MppDepositInstructions } from './mpp.js';
+export type { MppDepositInstructions, MppDepositIntent, MppDepositState } from './mpp.js';
+export { formatMppBaseUnits, MPP_TOKEN_ADDRESS, BASE_CHAIN_ID, MPP_DECIMALS } from './mpp.js';
 export interface ServerOptions {
     /** msk_… Never ship this to a browser. */
     secretKey: string;
@@ -140,6 +143,18 @@ export declare function getPaymentStatus(fulfillmentId: string, o?: {
     amountUoa: Uoa;
     settledAt?: Date;
 }>;
+/**
+ * Pay from an exchange, raised by your server: an MPP deposit address and the
+ * EXACT amount to send there on Base, for a fulfillment you hold.
+ *
+ * Idempotent per request: a repeat returns the same intent. Paid detection is
+ * unchanged: watch `getPaymentStatus` (or the webhook) for the fulfillment to
+ * confirm. `refundAddress` is checked locally (0x + 40 hex, non-zero) before
+ * the request; anything the forwarder cannot route is returned there.
+ */
+export declare function createMppDepositIntent(fulfillmentId: string, o: ServerOptions & {
+    refundAddress: string;
+}): Promise<MppDepositInstructions>;
 /** The header carrying the signature. Node lowercases incoming header names. */
 export declare const WEBHOOK_SIGNATURE_HEADER = "x-megprime-signature";
 /** Same value as the payload's `id`. */
@@ -380,6 +395,6 @@ export declare function getPaymentRequest(o: ServerOptions & {
 }): Promise<PaymentRequestDetails>;
 /** @deprecated Use `getPaymentRequest`. Same call. */
 export declare const getPayRequest: typeof getPaymentRequest;
-export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, type QrOptions, QrInputError } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, type QrOptions, QrInputError } from './qr.js';
 export type { CheckoutError, CheckoutErrorCode, Currency, Uoa } from './types.js';
 export { formatUoa } from './money.js';

@@ -79,6 +79,10 @@ export type CheckoutErrorCode =
  | 'webhook_event_not_found'
 /** The server refused the body or query (e.g. `limit` outside 1..100). */
  | 'invalid_body'
+/** Pay from an exchange: no deposit intent with that id, or for that refund
+ *  address, on this pay request. On `resumeMppDepositIntent` it means this
+ *  payer has not opened one yet: offer `createMppDepositIntent`. */
+ | 'mpp_deposit_intent_not_found'
 /** The request never reached the gateway, or the gateway never answered. */
  | 'network'
 /** The SDK refused the options it was handed, before any request. */
