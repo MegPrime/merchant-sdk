@@ -1,10 +1,9 @@
 import { isTerminal, } from './types.js';
 import { errorFromResponse, makeError } from './errors.js';
 import { uuid } from './uuid.js';
-import { walletPayUrlFor } from './qr.js';
+import { payOriginsFor, payUrlFor } from './qr.js';
 import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
 const DEFAULT_GATEWAY = 'https://api.megprimepay.com';
-const DEFAULT_PAY_ORIGIN = 'https://app.megprimepay.com';
 const MAX_MEMO = 200;
 /**
  * The polling ladder.
@@ -80,8 +79,8 @@ export class Checkout {
         // needed, and polling begins immediately.
         if (this.attachTo) {
             this.snap.fulfillmentId = this.attachTo;
-            this.snap.payUrl = `${DEFAULT_PAY_ORIGIN}/send?fulfillment_id=${encodeURIComponent(this.attachTo)}`;
-            this.snap.walletPayUrl = walletPayUrlFor(this.attachTo);
+            this.snap.payUrl = payUrlFor(this.attachTo, payOriginsFor(this.opts).app);
+            this.snap.walletPayUrl = payUrlFor(this.attachTo, payOriginsFor(this.opts).wallet);
             this.startedAt = Date.now();
             this.transition('awaiting_payment');
             this.watchVisibility();
@@ -132,8 +131,8 @@ export class Checkout {
             const dl = str(data.deadline);
             if (dl)
                 this.snap.deadline = new Date(dl);
-            this.snap.payUrl = `${DEFAULT_PAY_ORIGIN}/send?fulfillment_id=${encodeURIComponent(fulfillmentId)}`;
-            this.snap.walletPayUrl = walletPayUrlFor(fulfillmentId);
+            this.snap.payUrl = payUrlFor(fulfillmentId, payOriginsFor(this.opts).app);
+            this.snap.walletPayUrl = payUrlFor(fulfillmentId, payOriginsFor(this.opts).wallet);
             this.startedAt = Date.now();
             this.transition('awaiting_payment');
             this.watchVisibility();

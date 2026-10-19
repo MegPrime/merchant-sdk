@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.7.0
+npm install github:MegPrime/merchant-sdk#v0.7.1
 ```
 
 No registry account or token is needed. The package still installs as
@@ -99,10 +99,20 @@ await toQrSvg(payUrlFor(fulfillmentId));
 
 Every request has two payer links, both `/send?fulfillment_id=<id>`:
 
-| Field | Origin | Use it for |
-| --- | --- | --- |
-| `payUrl` | `https://app.megprimepay.com` | MegPrime users, who pay in the app. |
-| `walletPayUrl` | `https://merchant.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
+| Field | PROD origin | UAT origin (`env: 'uat'`) | Use it for |
+| --- | --- | --- | --- |
+| `payUrl` | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | MegPrime users, who pay in the app. |
+| `walletPayUrl` | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
+
+**Testing with a UAT key? Pass `env: 'uat'`.** The key decides which
+environment a request lives in, but the links are built locally, and the
+default is PROD. A UAT request opened on a PROD host is refused (a blank page
+and a 403). `createPaymentRequest`, `getPaymentRequest` and `new Checkout(...)`
+all take `env`, plus `payOrigin` / `walletPayOrigin` to name a host directly:
+
+```ts
+await createPaymentRequest({ secretKey, amountUoa, env: process.env.MEGPRIME_ENV === 'uat' ? 'uat' : 'prod' });
+```
 
 The wallet link is for the test store only until MegPrime decides on KYC.
 `payUrl` is unchanged. Build either from an id with `payUrlFor(id)` and

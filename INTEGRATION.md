@@ -77,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.7.0
+npm install github:MegPrime/merchant-sdk#v0.7.1
 ```
 
 No registry account or token is needed. The package still installs as
@@ -323,6 +323,12 @@ is for anyone with a Base wallet holding USDC; it needs no MegPrime account.
 The wallet link is for the test store only until MegPrime decides on KYC.
 Show whichever fits the payer, or both as two QR codes
 (`appQrSvg(id)` / `walletQrSvg(id)`).
+
+**With a UAT key, pass `env: 'uat'`.** The links are built locally and default
+to PROD hosts; a UAT request opened on a PROD host is refused (a blank page and
+a 403). `env: 'uat'` gives `https://uat.megprimepay.com` and
+`https://merchant-uat.megprimepay.com`; `payOrigin` / `walletPayOrigin` name a
+host directly.
 
 ---
 

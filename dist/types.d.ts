@@ -153,6 +153,12 @@ export interface CheckoutOptions {
     priceId: string;
     /** Gateway root. Defaults to https://api.megprimepay.com */
     gateway?: string;
+    /** Pay-page environment for payUrl/walletPayUrl. Defaults to 'prod'; set 'uat' with a UAT key. */
+    env?: 'prod' | 'uat';
+    /** payUrl host, overriding `env`. */
+    payOrigin?: string;
+    /** walletPayUrl host, overriding `env`. */
+    walletPayOrigin?: string;
     /**
      * One uuid per SALE, not per attempt.
      *

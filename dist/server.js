@@ -116,6 +116,7 @@ export async function createPaymentRequest(o) {
     if ((o.memo?.length ?? 0) > 200) {
         throw makeError('invalid_options', 'memo must be 200 characters or fewer');
     }
+    payOriginsFor(o); // refuse a bad env before the request exists, not after
     return call('/api/v1/mpmerchant/server/pay-requests', 'POST', o, {
         notional_uoa: amount,
         ...(o.clientRef ? { client_ref: o.clientRef } : {}),
@@ -131,7 +132,7 @@ export async function createPaymentRequest(o) {
             clientRef: str(d.client_ref),
             // Built here so nothing downstream has to know the URL shape. Absent
             // exactly when the id is — a link to nothing is worse than no link.
-            ...(id ? { payUrl: payUrlForId(id), walletPayUrl: walletPayUrlForId(id) } : {}),
+            ...(id ? payLinks(id, o) : {}),
         };
     });
 }
@@ -504,6 +505,7 @@ export async function redeliverEvent(o) {
  * the amount with `getPaymentStatus` before releasing goods.
  */
 export async function getPaymentRequest(o) {
+    payOriginsFor(o);
     return call(`/api/v1/mpmerchant/server/pay-requests/${needId(o.id, 'id')}`, 'GET', o, undefined, (d) => {
         // Never fall back to the request id: a pay link must only ever name a
         // fulfillment, and an unconfirmed request has none.
@@ -520,7 +522,7 @@ export async function getPaymentRequest(o) {
             settledAt: date(d.settled_at),
             voidedAt: date(d.voided_at),
             createdAt: date(d.created_at),
-            ...(fid ? { payUrl: payUrlForId(fid), walletPayUrl: walletPayUrlForId(fid) } : {}),
+            ...(fid ? payLinks(fid, o) : {}),
         };
     });
 }
@@ -529,5 +531,10 @@ export const getPayRequest = getPaymentRequest;
 // Re-exported from qr.ts so a server rendering a receipt does not need a second
 // import path. Drawing a QR needs no credential.
 export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError } from './qr.js';
-import { payUrlFor as payUrlForId, walletPayUrlFor as walletPayUrlForId } from './qr.js';
+import { payUrlFor as payUrlForId, payOriginsFor } from './qr.js';
+export { PAY_ORIGINS, payOriginsFor } from './qr.js';
+function payLinks(fulfillmentId, o) {
+    const origins = payOriginsFor(o);
+    return { payUrl: payUrlForId(fulfillmentId, origins.app), walletPayUrl: payUrlForId(fulfillmentId, origins.wallet) };
+}
 export { formatUoa } from './money.js';

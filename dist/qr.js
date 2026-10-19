@@ -88,6 +88,18 @@ export async function toQrSvg(payUrl, options) {
  * that from a broken payment.
  */
 export const WALLET_PAY_ORIGIN = 'https://merchant.megprimepay.com';
+export const PAY_ORIGINS = {
+    prod: { app: 'https://app.megprimepay.com', wallet: WALLET_PAY_ORIGIN },
+    uat: { app: 'https://uat.megprimepay.com', wallet: 'https://merchant-uat.megprimepay.com' },
+};
+/** The app and wallet hosts for these options. An unknown `env` is refused rather than defaulted to PROD. */
+export function payOriginsFor(o) {
+    const env = o?.env ?? 'prod';
+    const base = PAY_ORIGINS[env];
+    if (!base)
+        throw new QrInputError(`env must be 'prod' or 'uat', got '${String(env)}'`);
+    return { app: o?.payOrigin || base.app, wallet: o?.walletPayOrigin || base.wallet };
+}
 export function payUrlFor(fulfillmentId, payOrigin = 'https://app.megprimepay.com') {
     const id = String(fulfillmentId ?? '').trim();
     if (!id)

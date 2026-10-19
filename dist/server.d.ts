@@ -38,6 +38,12 @@ export interface ServerOptions {
     gateway?: string;
     /** Aborts the request. Default 10s: a checkout waiting on this is a customer waiting. */
     timeoutMs?: number;
+    /** Pay-page environment for the payUrl/walletPayUrl this returns. Defaults to 'prod'; set 'uat' with a UAT key. */
+    env?: PayEnv;
+    /** payUrl host, overriding `env`. */
+    payOrigin?: string;
+    /** walletPayUrl host, overriding `env`. */
+    walletPayOrigin?: string;
 }
 export interface CreatePaymentOptions extends ServerOptions {
     /** Minor units as a decimal string. Your server decides this. */
@@ -396,5 +402,7 @@ export declare function getPaymentRequest(o: ServerOptions & {
 /** @deprecated Use `getPaymentRequest`. Same call. */
 export declare const getPayRequest: typeof getPaymentRequest;
 export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, type QrOptions, QrInputError } from './qr.js';
+import { type PayEnv } from './qr.js';
+export { PAY_ORIGINS, payOriginsFor, type PayEnv, type PayLinkOptions } from './qr.js';
 export type { CheckoutError, CheckoutErrorCode, Currency, Uoa } from './types.js';
 export { formatUoa } from './money.js';

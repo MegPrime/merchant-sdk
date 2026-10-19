@@ -69,6 +69,30 @@ export declare function toQrSvg(payUrl: string, options?: QrOptions): Promise<st
  * that from a broken payment.
  */
 export declare const WALLET_PAY_ORIGIN = "https://merchant.megprimepay.com";
+/**
+ * The pay-page hosts for each environment. The key decides which environment a
+ * payment request lives in, but the SDK builds links locally and cannot see the
+ * key's tenant: a UAT request opened on a PROD host is refused (403) by the
+ * wrong environment. Pick the hosts with `env`, or name them directly.
+ */
+export type PayEnv = 'prod' | 'uat';
+export declare const PAY_ORIGINS: Readonly<Record<PayEnv, {
+    app: string;
+    wallet: string;
+}>>;
+export interface PayLinkOptions {
+    /** Which environment's pay pages the links open. Defaults to 'prod'. Set 'uat' with a UAT key. */
+    env?: PayEnv;
+    /** The app link's host, overriding `env`. */
+    payOrigin?: string;
+    /** The wallet link's host, overriding `env`. */
+    walletPayOrigin?: string;
+}
+/** The app and wallet hosts for these options. An unknown `env` is refused rather than defaulted to PROD. */
+export declare function payOriginsFor(o?: PayLinkOptions): {
+    app: string;
+    wallet: string;
+};
 export declare function payUrlFor(fulfillmentId: string, payOrigin?: string): string;
 /**
  * The wallet link for a fulfillment id: https://merchant.megprimepay.com/send?fulfillment_id=<id>
