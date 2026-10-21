@@ -92,7 +92,7 @@ export const WALLET_PAY_ORIGIN = 'https://merchant.megprimepay.com';
 export const PAY_ORIGINS = {
     prod: { app: 'https://app.megprimepay.com', wallet: WALLET_PAY_ORIGIN },
     uat: { app: 'https://uat.megprimepay.com', wallet: 'https://merchant-uat.megprimepay.com' },
-    sandbox: { app: 'https://dev.megprimepay.com', wallet: 'https://dev-merchant.megprimepay.com' },
+    sandbox: { app: 'https://dev.megprimepay.com', wallet: 'https://merchant-dev.megprimepay.com' },
 };
 /** The app and wallet hosts for these options. An unknown `env` is refused rather than defaulted to PROD. */
 export function payOriginsFor(o) {

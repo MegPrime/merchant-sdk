@@ -77,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.8.1
+npm install github:MegPrime/merchant-sdk#v0.8.2
 ```
 
 No registry account or token is needed. The package still installs as
@@ -343,7 +343,7 @@ directly (the Supabase examples above), `MEGPRIME_GATEWAY` stays
 | --- | --- | --- | --- |
 | Gateway (default for `gateway`) | `https://api.megprimepay.com` | `https://api.megprimepay.com` | `https://api.megprimepay.com` |
 | App pay host (`payUrl`) | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` |
-| Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://dev-merchant.megprimepay.com` |
+| Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://merchant-dev.megprimepay.com` |
 | Chain | Base (8453) | Base (8453) | Base Sepolia (84532) |
 | Settlement token | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | testnet USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | MPP / pay from an exchange | yes | yes | not yet (throws `unsupported_on_sandbox`) |

@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.8.1
+npm install github:MegPrime/merchant-sdk#v0.8.2
 ```
 
 No registry account or token is needed. The package still installs as
@@ -37,7 +37,7 @@ decides the tenant.
 | --- | --- | --- | --- |
 | Gateway (default for `gateway`) | `https://api.megprimepay.com` | `https://api.megprimepay.com` | `https://api.megprimepay.com` |
 | App pay host (`payUrl`) | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` |
-| Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://dev-merchant.megprimepay.com` |
+| Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://merchant-dev.megprimepay.com` |
 | Chain | Base (8453) | Base (8453) | Base Sepolia (84532) |
 | Settlement token | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | testnet USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | MPP / pay from an exchange | yes | yes | not yet (throws `unsupported_on_sandbox`) |
@@ -143,7 +143,7 @@ Every request has two payer links, both `/send?fulfillment_id=<id>`:
 | Field | PROD origin | UAT origin (`env: 'uat'`) | Sandbox origin (`env: 'sandbox'`) | Use it for |
 | --- | --- | --- | --- | --- |
 | `payUrl` | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` | MegPrime users, who pay in the app. |
-| `walletPayUrl` | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://dev-merchant.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
+| `walletPayUrl` | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://merchant-dev.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
 
 **Testing with a UAT key? Pass `env: 'uat'`** (a sandbox key: `env: 'sandbox'`, see [Environments](#environments)). The key decides which
 environment a request lives in, but the links are built locally, and the
