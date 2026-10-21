@@ -2,8 +2,8 @@ import { isTerminal, } from './types.js';
 import { errorFromResponse, makeError } from './errors.js';
 import { uuid } from './uuid.js';
 import { payOriginsFor, payUrlFor } from './qr.js';
+import { assertMppSupported, gatewayFor } from './env.js';
 import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
-const DEFAULT_GATEWAY = 'https://api.megprimepay.com';
 const MAX_MEMO = 200;
 /**
  * The polling ladder.
@@ -187,6 +187,7 @@ export class Checkout {
      * request; the gateway's code otherwise).
      */
     async createMppDepositIntent(o) {
+        assertMppSupported(this.opts.env);
         const refund = assertRefundAddress(o?.refundAddress);
         const id = this.requireFulfillmentId();
         const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}`, {
@@ -200,6 +201,7 @@ export class Checkout {
     }
     /** Read back the deposit intent `createMppDepositIntent` issued. */
     async getMppDepositIntent() {
+        assertMppSupported(this.opts.env);
         const id = this.requireFulfillmentId();
         if (!this.mppIntentId) {
             throw makeError('invalid_options', 'no MPP deposit intent yet: call createMppDepositIntent first');
@@ -212,6 +214,7 @@ export class Checkout {
      * never creates one). 404 `mpp_deposit_intent_not_found` when they have none.
      */
     async resumeMppDepositIntent(o) {
+        assertMppSupported(this.opts.env);
         const refund = assertRefundAddress(o?.refundAddress);
         const id = this.requireFulfillmentId();
         const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}?refund_address=${encodeURIComponent(refund)}`, { method: 'GET' });
@@ -240,7 +243,7 @@ export class Checkout {
         return (body.data ?? {});
     }
     gateway() {
-        return (this.opts.gateway || DEFAULT_GATEWAY).replace(/\/+$/, '');
+        return gatewayFor(this.opts);
     }
     /** Refuse locally what the server would refuse anyway, to save a round trip
      *  and to give a developer the error at the call site. */
@@ -254,6 +257,14 @@ export class Checkout {
         }
         if ((this.opts.memo?.length ?? 0) > MAX_MEMO) {
             return makeError('invalid_options', `memo must be ${MAX_MEMO} characters or fewer`);
+        }
+        // An unknown env is refused before the request exists, not after.
+        try {
+            payOriginsFor(this.opts);
+            gatewayFor(this.opts);
+        }
+        catch (e) {
+            return makeError('invalid_options', e instanceof Error ? e.message : 'invalid env');
         }
         return undefined;
     }

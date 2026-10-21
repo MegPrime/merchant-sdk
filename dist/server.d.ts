@@ -31,14 +31,17 @@ import type { Currency, Uoa } from './types.js';
 import { type MppDepositInstructions } from './mpp.js';
 export type { MppDepositInstructions, MppDepositIntent, MppDepositState } from './mpp.js';
 export { formatMppBaseUnits, MPP_TOKEN_ADDRESS, BASE_CHAIN_ID, MPP_DECIMALS } from './mpp.js';
+export { ENVS, GATEWAYS, CHAINS, BASE_SEPOLIA_CHAIN_ID, USDC_BASE_ADDRESS, USDC_BASE_SEPOLIA_ADDRESS, gatewayFor, chainFor, type ChainInfo, } from './env.js';
 export interface ServerOptions {
     /** msk_… Never ship this to a browser. */
     secretKey: string;
-    /** Gateway root. Defaults to https://api.megprimepay.com */
+    /** Gateway root, overriding `env`. Defaults to https://api.megprimepay.com for every env
+     *  (prod, uat and sandbox are tenants of one API; the key picks the tenant). */
     gateway?: string;
     /** Aborts the request. Default 10s: a checkout waiting on this is a customer waiting. */
     timeoutMs?: number;
-    /** Pay-page environment for the payUrl/walletPayUrl this returns. Defaults to 'prod'; set 'uat' with a UAT key. */
+    /** Environment: picks the payUrl/walletPayUrl hosts and the chain. Defaults to 'prod';
+     *  set 'uat' with a UAT key, 'sandbox' with a sandbox key. */
     env?: PayEnv;
     /** payUrl host, overriding `env`. */
     payOrigin?: string;
@@ -143,6 +146,7 @@ export declare function getRefundProposal(o: ServerOptions & {
 export declare function getPaymentStatus(fulfillmentId: string, o?: {
     gateway?: string;
     timeoutMs?: number;
+    env?: PayEnv;
 }): Promise<{
     status: string;
     paidUoa: Uoa;
@@ -401,7 +405,7 @@ export declare function getPaymentRequest(o: ServerOptions & {
 }): Promise<PaymentRequestDetails>;
 /** @deprecated Use `getPaymentRequest`. Same call. */
 export declare const getPayRequest: typeof getPaymentRequest;
-export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, type QrOptions, QrInputError } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, type QrOptions, type MppQrOptions, QrInputError } from './qr.js';
 import { type PayEnv } from './qr.js';
 export { PAY_ORIGINS, payOriginsFor, type PayEnv, type PayLinkOptions } from './qr.js';
 export type { CheckoutError, CheckoutErrorCode, Currency, Uoa } from './types.js';

@@ -16,6 +16,7 @@
  * that scans cleanly and does nothing, which is the worst failure available —
  * it looks like it worked.
  */
+import { type PayEnv } from './env.js';
 /** Options both renderers share. Defaults suit a payment on a phone screen. */
 export interface QrOptions {
     /** Pixel width for the data URL, or viewport size for the SVG. Default 240. */
@@ -75,13 +76,13 @@ export declare const WALLET_PAY_ORIGIN = "https://merchant.megprimepay.com";
  * key's tenant: a UAT request opened on a PROD host is refused (403) by the
  * wrong environment. Pick the hosts with `env`, or name them directly.
  */
-export type PayEnv = 'prod' | 'uat';
+export type { PayEnv };
 export declare const PAY_ORIGINS: Readonly<Record<PayEnv, {
     app: string;
     wallet: string;
 }>>;
 export interface PayLinkOptions {
-    /** Which environment's pay pages the links open. Defaults to 'prod'. Set 'uat' with a UAT key. */
+    /** Which environment's pay pages the links open. Defaults to 'prod'. Set 'uat' with a UAT key, 'sandbox' with a sandbox key. */
     env?: PayEnv;
     /** The app link's host, overriding `env`. */
     payOrigin?: string;
@@ -106,15 +107,22 @@ export declare function walletPayUrlFor(fulfillmentId: string, origin?: string):
 export declare function walletQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
 /** PNG data-URL QR of the wallet link for a fulfillment id. */
 export declare function walletQrDataUrl(fulfillmentId: string, options?: QrOptions): Promise<string>;
+/** Which environment the MPP transfer is for. MPP exists on PROD/UAT (Base) only. */
+export interface MppQrOptions {
+    /** Defaults to 'prod'. 'sandbox' throws `unsupported_on_sandbox`: there is no MPP token on Base Sepolia yet. */
+    env?: PayEnv;
+}
 /**
  * `ethereum:<MPP>@8453/transfer?address=<sendTo>&uint256=<amountBaseUnits>`.
- * Throws QrInputError on a malformed address or a non-integer amount.
+ * Throws QrInputError on a malformed address or a non-integer amount, and a
+ * CheckoutError `unsupported_on_sandbox` for env 'sandbox' (never a mainnet
+ * URI from a testnet checkout).
  */
-export declare function mppTransferUri(sendTo: string, amountBaseUnits: string): string;
+export declare function mppTransferUri(sendTo: string, amountBaseUnits: string, o?: MppQrOptions): string;
 /** SVG QR of the MPP transfer. Uses the same renderer and options as the codes above. */
-export declare function mppDepositQrSvg(sendTo: string, amountBaseUnits: string, options?: QrOptions): Promise<string>;
+export declare function mppDepositQrSvg(sendTo: string, amountBaseUnits: string, options?: QrOptions & MppQrOptions): Promise<string>;
 /** PNG data-URL QR of the MPP transfer. */
-export declare function mppDepositQrDataUrl(sendTo: string, amountBaseUnits: string, options?: QrOptions): Promise<string>;
+export declare function mppDepositQrDataUrl(sendTo: string, amountBaseUnits: string, options?: QrOptions & MppQrOptions): Promise<string>;
 /** SVG QR of the app link for a fulfillment id. */
 export declare function appQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
 /** PNG data-URL QR of the app link for a fulfillment id. */

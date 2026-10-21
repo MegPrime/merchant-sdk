@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.7.1
+npm install github:MegPrime/merchant-sdk#v0.8.1
 ```
 
 No registry account or token is needed. The package still installs as
@@ -23,6 +23,47 @@ const checkout = createCheckout({
 });
 
 await checkout.start();
+```
+
+## Environments
+
+`env` selects the environment everywhere it is accepted (`createCheckout`,
+`attachCheckout`, every `/server` function, `getPaymentStatus`). Use the env
+that matches your key. It picks the pay-link hosts and the chain. The gateway is
+the same for all three: every environment is a tenant of one API, and the key
+decides the tenant.
+
+| | `prod` (default) | `uat` | `sandbox` (coming soon) |
+| --- | --- | --- | --- |
+| Gateway (default for `gateway`) | `https://api.megprimepay.com` | `https://api.megprimepay.com` | `https://api.megprimepay.com` |
+| App pay host (`payUrl`) | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` |
+| Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://dev-merchant.megprimepay.com` |
+| Chain | Base (8453) | Base (8453) | Base Sepolia (84532) |
+| Settlement token | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | testnet USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| MPP / pay from an exchange | yes | yes | not yet (throws `unsupported_on_sandbox`) |
+| Real money? | **Yes** | **Yes**: same chain and tokens as PROD, separate tenant | No: separate tenant, testnet tokens with no value |
+
+- **An explicit `gateway` always wins** over `env`'s default; `payOrigin` /
+  `walletPayOrigin` override the pay hosts the same way.
+- **An unknown `env` is refused** (`invalid_options`) before any request,
+  never defaulted to PROD.
+- **The sandbox is a tenant of the PROD API**, like UAT: same gateway, and
+  the sandbox key selects the sandbox tenant. It runs on **Base Sepolia with
+  testnet USDC**: get some from the Circle faucet at https://faucet.circle.com
+  (pick Base Sepolia). MPP and pay from an exchange are not on the sandbox
+  yet: `mppTransferUri`,
+  `mppDepositQr*` and the `*MppDepositIntent` methods throw
+  `unsupported_on_sandbox` with `env: 'sandbox'`.
+- **The sandbox is coming soon.** The option ships now so integrations can be
+  written against it; sandbox keys and hosts are not live until MegPrime
+  announces them.
+
+`gatewayFor({ env })`, `payOriginsFor({ env })` and `chainFor(env)` return
+these values; `GATEWAYS`, `PAY_ORIGINS` and `CHAINS` are the tables.
+
+```ts
+const env = (process.env.MEGPRIME_ENV ?? 'prod') as 'prod' | 'uat' | 'sandbox';
+await createPaymentRequest({ secretKey, amountUoa, env });
 ```
 
 ## Why the key is safe to publish
@@ -99,12 +140,12 @@ await toQrSvg(payUrlFor(fulfillmentId));
 
 Every request has two payer links, both `/send?fulfillment_id=<id>`:
 
-| Field | PROD origin | UAT origin (`env: 'uat'`) | Use it for |
-| --- | --- | --- | --- |
-| `payUrl` | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | MegPrime users, who pay in the app. |
-| `walletPayUrl` | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
+| Field | PROD origin | UAT origin (`env: 'uat'`) | Sandbox origin (`env: 'sandbox'`) | Use it for |
+| --- | --- | --- | --- | --- |
+| `payUrl` | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` | MegPrime users, who pay in the app. |
+| `walletPayUrl` | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://dev-merchant.megprimepay.com` | Anyone with a Base wallet holding USDC. No MegPrime account needed. |
 
-**Testing with a UAT key? Pass `env: 'uat'`.** The key decides which
+**Testing with a UAT key? Pass `env: 'uat'`** (a sandbox key: `env: 'sandbox'`, see [Environments](#environments)). The key decides which
 environment a request lives in, but the links are built locally, and the
 default is PROD. A UAT request opened on a PROD host is refused (a blank page
 and a 403). `createPaymentRequest`, `getPaymentRequest` and `new Checkout(...)`

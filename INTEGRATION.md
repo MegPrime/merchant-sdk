@@ -77,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.7.1
+npm install github:MegPrime/merchant-sdk#v0.8.1
 ```
 
 No registry account or token is needed. The package still installs as
@@ -329,6 +329,34 @@ to PROD hosts; a UAT request opened on a PROD host is refused (a blank page and
 a 403). `env: 'uat'` gives `https://uat.megprimepay.com` and
 `https://merchant-uat.megprimepay.com`; `payOrigin` / `walletPayOrigin` name a
 host directly.
+
+### Environments
+
+Pass the `env` that matches the merchant's key. It picks the pay hosts and the
+chain; the gateway is `https://api.megprimepay.com` for all three, because
+every environment is a tenant of one API and the key decides the tenant. An explicit `gateway` always wins; an unknown `env` is
+refused (`invalid_options`) before any request. If you call the HTTP API
+directly (the Supabase examples above), `MEGPRIME_GATEWAY` stays
+`https://api.megprimepay.com` whichever env the key belongs to.
+
+| | `prod` (default) | `uat` | `sandbox` (coming soon) |
+| --- | --- | --- | --- |
+| Gateway (default for `gateway`) | `https://api.megprimepay.com` | `https://api.megprimepay.com` | `https://api.megprimepay.com` |
+| App pay host (`payUrl`) | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` |
+| Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://dev-merchant.megprimepay.com` |
+| Chain | Base (8453) | Base (8453) | Base Sepolia (84532) |
+| Settlement token | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | testnet USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| MPP / pay from an exchange | yes | yes | not yet (throws `unsupported_on_sandbox`) |
+| Real money? | **Yes** | **Yes**: same chain and tokens as PROD, separate tenant | No: separate tenant, testnet tokens with no value |
+
+The sandbox is **coming soon**: the option exists now, but sandbox keys and
+hosts are not live until MegPrime announces them. Like UAT, it is a tenant of
+the PROD API (same gateway; the sandbox key selects it), on **Base Sepolia
+with testnet USDC** (free from the Circle faucet, https://faucet.circle.com,
+network Base Sepolia); nothing there is real money.
+MPP and pay from an exchange are not on the sandbox yet: those helpers throw
+`unsupported_on_sandbox` with `env: 'sandbox'`. UAT, by contrast, is real
+money on Base mainnet.
 
 ---
 

@@ -16,6 +16,7 @@
  * that scans cleanly and does nothing, which is the worst failure available —
  * it looks like it worked.
  */
+import { assertMppSupported, chainFor } from './env.js';
 /** The error every function here throws when handed something unencodable. */
 export class QrInputError extends Error {
     constructor(message) {
@@ -91,13 +92,14 @@ export const WALLET_PAY_ORIGIN = 'https://merchant.megprimepay.com';
 export const PAY_ORIGINS = {
     prod: { app: 'https://app.megprimepay.com', wallet: WALLET_PAY_ORIGIN },
     uat: { app: 'https://uat.megprimepay.com', wallet: 'https://merchant-uat.megprimepay.com' },
+    sandbox: { app: 'https://dev.megprimepay.com', wallet: 'https://dev-merchant.megprimepay.com' },
 };
 /** The app and wallet hosts for these options. An unknown `env` is refused rather than defaulted to PROD. */
 export function payOriginsFor(o) {
     const env = o?.env ?? 'prod';
-    const base = PAY_ORIGINS[env];
+    const base = Object.prototype.hasOwnProperty.call(PAY_ORIGINS, env) ? PAY_ORIGINS[env] : undefined;
     if (!base)
-        throw new QrInputError(`env must be 'prod' or 'uat', got '${String(env)}'`);
+        throw new QrInputError(`env must be 'prod', 'uat' or 'sandbox', got '${String(env)}'`);
     return { app: o?.payOrigin || base.app, wallet: o?.walletPayOrigin || base.wallet };
 }
 export function payUrlFor(fulfillmentId, payOrigin = 'https://app.megprimepay.com') {
@@ -124,20 +126,16 @@ export function walletQrSvg(fulfillmentId, options) {
 export function walletQrDataUrl(fulfillmentId, options) {
     return toQrDataUrl(walletPayUrlFor(fulfillmentId), options);
 }
-// ---------------------------------------------------------------------------
-// Pay from an exchange: the MPP transfer QR.
-//
-// Unlike every code above, this one is not a payUrl. It is an EIP-681 token
-// transfer a wallet can execute directly: MPP, on Base (8453), to the deposit
-// address, for the exact base-unit amount. The amount is a decimal string and
-// is encoded verbatim; a Number would round it.
-const MPP_TOKEN = '0x6E02F4A1631379a49e8B7E222CfA6Bf913b05E89';
-const BASE_CHAIN = 8453;
 /**
  * `ethereum:<MPP>@8453/transfer?address=<sendTo>&uint256=<amountBaseUnits>`.
- * Throws QrInputError on a malformed address or a non-integer amount.
+ * Throws QrInputError on a malformed address or a non-integer amount, and a
+ * CheckoutError `unsupported_on_sandbox` for env 'sandbox' (never a mainnet
+ * URI from a testnet checkout).
  */
-export function mppTransferUri(sendTo, amountBaseUnits) {
+export function mppTransferUri(sendTo, amountBaseUnits, o) {
+    assertMppSupported(o?.env);
+    const chain = chainFor(o?.env);
+    const mpp = chain.mppToken;
     const to = String(sendTo ?? '').trim();
     if (!/^0x[0-9a-fA-F]{40}$/.test(to) || /^0x0{40}$/.test(to)) {
         throw new QrInputError('sendTo must be a non-zero 0x address (the deposit address from createMppDepositIntent)');
@@ -146,17 +144,17 @@ export function mppTransferUri(sendTo, amountBaseUnits) {
     if (typeof amountBaseUnits !== 'string' || !/^\d+$/.test(amt) || /^0+$/.test(amt)) {
         throw new QrInputError('amountBaseUnits must be a positive decimal string of 18-dp base units (amountToSend), never a Number');
     }
-    return `ethereum:${MPP_TOKEN}@${BASE_CHAIN}/transfer?address=${to}&uint256=${amt}`;
+    return `ethereum:${mpp.address}@${chain.chainId}/transfer?address=${to}&uint256=${amt}`;
 }
 /** SVG QR of the MPP transfer. Uses the same renderer and options as the codes above. */
 export async function mppDepositQrSvg(sendTo, amountBaseUnits, options) {
-    const uri = mppTransferUri(sendTo, amountBaseUnits);
+    const uri = mppTransferUri(sendTo, amountBaseUnits, options);
     const qrcode = await import('qrcode');
     return qrcode.toString(uri, { ...opts(options), type: 'svg' });
 }
 /** PNG data-URL QR of the MPP transfer. */
 export async function mppDepositQrDataUrl(sendTo, amountBaseUnits, options) {
-    const uri = mppTransferUri(sendTo, amountBaseUnits);
+    const uri = mppTransferUri(sendTo, amountBaseUnits, options);
     const qrcode = await import('qrcode');
     return qrcode.toDataURL(uri, opts(options));
 }

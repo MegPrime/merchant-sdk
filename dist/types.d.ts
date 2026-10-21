@@ -87,6 +87,9 @@ export type CheckoutErrorCode =
  | 'network'
 /** The SDK refused the options it was handed, before any request. */
  | 'invalid_options'
+/** Not available in the sandbox yet (MPP / pay from an exchange: there is no
+ *  MPP token on Base Sepolia). Refused locally, before any request. */
+ | 'unsupported_on_sandbox'
 /** Anything the SDK does not recognise. */
  | 'unknown';
 export interface CheckoutError extends Error {
@@ -151,10 +154,12 @@ export interface CheckoutOptions {
     publishableKey: string;
     /** A price the STORE registered. The only thing a client may choose. */
     priceId: string;
-    /** Gateway root. Defaults to https://api.megprimepay.com */
+    /** Gateway root, overriding `env`. Defaults to https://api.megprimepay.com for every env
+     *  (prod, uat and sandbox are tenants of one API; the key picks the tenant). */
     gateway?: string;
-    /** Pay-page environment for payUrl/walletPayUrl. Defaults to 'prod'; set 'uat' with a UAT key. */
-    env?: 'prod' | 'uat';
+    /** Environment: picks the payUrl/walletPayUrl hosts and the chain. Defaults to 'prod';
+     *  set 'uat' with a UAT key, 'sandbox' with a sandbox key (Base Sepolia, testnet USDC). */
+    env?: 'prod' | 'uat' | 'sandbox';
     /** payUrl host, overriding `env`. */
     payOrigin?: string;
     /** walletPayUrl host, overriding `env`. */

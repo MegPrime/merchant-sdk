@@ -11,10 +11,8 @@
  * MPP is 14080296915726607 base units, already past 2^53.
  */
 import { makeError } from './errors.js';
-/** The MPP token on Base. */
-export const MPP_TOKEN_ADDRESS = '0x6E02F4A1631379a49e8B7E222CfA6Bf913b05E89';
-/** Base mainnet. */
-export const BASE_CHAIN_ID = 8453;
+/** The MPP token on Base, and Base mainnet. Defined with the other per-env chain info in env.ts. */
+export { MPP_TOKEN_ADDRESS, BASE_CHAIN_ID } from './env.js';
 /** MPP has 18 decimals. */
 export const MPP_DECIMALS = 18;
 /**

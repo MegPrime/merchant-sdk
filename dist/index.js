@@ -42,6 +42,8 @@ export { formatUoa } from './money.js';
 // qr.ts: the rule is that the thing to encode is `payUrl`, never an id.
 export { PAY_ORIGINS, payOriginsFor } from './qr.js';
 export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError } from './qr.js';
+// Environments: gateway, pay hosts, chain and settlement token per env. See env.ts.
+export { ENVS, GATEWAYS, CHAINS, BASE_SEPOLIA_CHAIN_ID, USDC_BASE_ADDRESS, USDC_BASE_SEPOLIA_ADDRESS, gatewayFor, chainFor, } from './env.js';
 // Pay from an exchange: an MPP deposit address, its exact amount, and the
 // EIP-681 transfer QR. See mpp.ts and qr.ts.
 export * from './mpp.js';

@@ -4,7 +4,8 @@ import type { MppDepositMethods } from './mpp.js';
 export * from './types.js';
 export { formatUoa } from './money.js';
 export { PAY_ORIGINS, payOriginsFor, type PayEnv, type PayLinkOptions } from './qr.js';
-export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError, type QrOptions } from './qr.js';
+export { toQrDataUrl, toQrSvg, payUrlFor, walletPayUrlFor, walletQrSvg, walletQrDataUrl, appQrSvg, appQrDataUrl, mppTransferUri, mppDepositQrSvg, mppDepositQrDataUrl, QrInputError, type QrOptions, type MppQrOptions } from './qr.js';
+export { ENVS, GATEWAYS, CHAINS, BASE_SEPOLIA_CHAIN_ID, USDC_BASE_ADDRESS, USDC_BASE_SEPOLIA_ADDRESS, gatewayFor, chainFor, type ChainInfo, } from './env.js';
 export * from './mpp.js';
 /** A running checkout. The pay-from-an-exchange methods come from MppDepositMethods (mpp.ts). */
 export interface CheckoutHandle extends MppDepositMethods {
