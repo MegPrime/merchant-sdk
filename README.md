@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.8.2
+npm install github:MegPrime/merchant-sdk#v0.9.0
 ```
 
 No registry account or token is needed. The package still installs as
@@ -407,7 +407,8 @@ an unknown `type` as "ignore and answer 2xx": new types can be added.
 
 **Payment request object:** `id` (request id), `fulfillment_id`, `store_id`,
 `terminal_id`, `client_ref`, `notional_uoa` (minor units, string), `currency`
-(`symbol`, `decimals`, `address`, `chain_id`), `memo`, `reference`,
+(`symbol`, `decimals`, `address`, `chain_id`), `memo`, `classification` and
+`classification_id` (only when the sale was created with one), `reference`,
 `receiver_wallet`, `request_token`, `chain_id`, `device_paired`, `deadline`,
 `status` (the payments core's last status, not normalised: lowercase it),
 `status_at`, `settled_at`, `voided_at`, `created_at`, `updated_at`; plus
@@ -550,6 +551,7 @@ const sale = await createPaymentRequest({
   secretKey: process.env.MEGPRIME_SECRET_KEY!,
   amountUoa: '12500000',          // minor units. Never a float
   clientRef: order.id,            // one per sale: a retry returns the SAME request
+  classification: 'hotel',        // optional: a slug the merchant registered (what the sale is FOR)
 });
 // send the browser sale.fulfillmentId — and nothing else
 
@@ -631,6 +633,8 @@ Branch on `err.code`, never on `err.message`.
 | `publishable_key_invalid` | no | unknown, revoked, expired or malformed |
 | `price_not_found` | no | no live price with that id on this key's store |
 | `price_over_key_cap` | no | the price exceeds this key's ceiling |
+| `classification_unknown` | no | `classification` is not a live slug on this key's tenant (unregistered, archived, or another tenant's); nothing was created |
+| `invalid_classification_slug` | no | `classification` is not a slug: lower-case letters, digits and single hyphens, 64 characters or fewer (refused locally) |
 | `embedded_payments_unavailable` | yes | the merchant's deployment is incomplete |
 | `rate_limited` | yes | too many requests from this key or address |
 | `network` | yes | the request never got an answer |
@@ -669,6 +673,20 @@ Pass `clientRef` — one uuid per **sale**, not per attempt. Your app knows what
 basket is; the SDK does not. A retry with the same `clientRef` returns the
 *same* request instead of charging twice. Omitted, the SDK mints one and holds
 it for the life of the checkout.
+
+### Classify a sale
+
+A merchant can register **payment classifications** — what a sale is *for*
+(`hotel`, `travel`) — in their MegPrime account, and you may name one by slug on
+any create: `classification` on `createPaymentRequest` and on the checkout
+options. The slug comes back on the request and in every webhook payload, so
+the merchant can group and report on it.
+
+The slug is a contract, not a label: it must match a **live** classification on
+the key's tenant exactly (the SDK lower-cases and trims it). An unregistered or
+archived slug is refused with `classification_unknown` and **nothing is
+created** — a typo is found at integration, not at month end. Omit it for an
+unclassified sale.
 
 ## Polling
 

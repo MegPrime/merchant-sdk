@@ -29,7 +29,7 @@
  */
 import { Buffer } from 'node:buffer';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { errorFromResponse, makeError } from './errors.js';
+import { errorFromResponse, makeError, normalizeClassification } from './errors.js';
 import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
 export { formatMppBaseUnits, MPP_TOKEN_ADDRESS, BASE_CHAIN_ID, MPP_DECIMALS } from './mpp.js';
 import { assertMppSupported, gatewayFor } from './env.js';
@@ -117,11 +117,13 @@ export async function createPaymentRequest(o) {
     if ((o.memo?.length ?? 0) > 200) {
         throw makeError('invalid_options', 'memo must be 200 characters or fewer');
     }
+    const classification = normalizeClassification(o.classification);
     payOriginsFor(o); // refuse a bad env before the request exists, not after
     return call('/api/v1/mpmerchant/server/pay-requests', 'POST', o, {
         notional_uoa: amount,
         ...(o.clientRef ? { client_ref: o.clientRef } : {}),
         ...(o.memo ? { memo: o.memo } : {}),
+        ...(classification ? { classification } : {}),
     }, (d) => {
         const id = str(d.fulfillment_id);
         return {
@@ -131,6 +133,7 @@ export async function createPaymentRequest(o) {
             currency: d.currency ?? undefined,
             deadline: date(d.deadline),
             clientRef: str(d.client_ref),
+            classification: str(d.classification),
             // Built here so nothing downstream has to know the URL shape. Absent
             // exactly when the id is — a link to nothing is worse than no link.
             ...(id ? payLinks(id, o) : {}),

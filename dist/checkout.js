@@ -1,5 +1,5 @@
 import { isTerminal, } from './types.js';
-import { errorFromResponse, makeError } from './errors.js';
+import { errorFromResponse, makeError, normalizeClassification } from './errors.js';
 import { uuid } from './uuid.js';
 import { payOriginsFor, payUrlFor } from './qr.js';
 import { assertMppSupported, gatewayFor } from './env.js';
@@ -104,6 +104,7 @@ export class Checkout {
                     price_id: this.opts.priceId.trim(),
                     client_ref: this.snap.clientRef,
                     ...(this.opts.memo ? { memo: this.opts.memo } : {}),
+                    ...(this.classification ? { classification: this.classification } : {}),
                 }),
             });
             const body = await res.json().catch(() => ({}));
@@ -257,6 +258,12 @@ export class Checkout {
         }
         if ((this.opts.memo?.length ?? 0) > MAX_MEMO) {
             return makeError('invalid_options', `memo must be ${MAX_MEMO} characters or fewer`);
+        }
+        try {
+            this.classification = normalizeClassification(this.opts.classification);
+        }
+        catch (e) {
+            return e;
         }
         // An unknown env is refused before the request exists, not after.
         try {

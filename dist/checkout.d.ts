@@ -19,6 +19,8 @@ export declare class Checkout {
      * handed an id and nothing worth tampering with.
      */
     private attachTo;
+    /** The normalised classification slug, set by validate(). */
+    private classification;
     constructor(opts: CheckoutOptions & {
         attachTo?: string;
     });

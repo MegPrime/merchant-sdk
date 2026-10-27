@@ -8,3 +8,9 @@ export declare function makeError(code: CheckoutErrorCode, message: string, stat
  * — a gateway, a proxy, a captive portal — and there is no envelope to read.
  */
 export declare function errorFromResponse(status: number, body: unknown): CheckoutError;
+/**
+ * Normalise a `classification` option the way the server does — trimmed and
+ * lower-cased — and refuse anything that could never match a registered slug.
+ * Undefined or blank means "unclassified" and sends nothing.
+ */
+export declare function normalizeClassification(v: string | undefined): string | undefined;

@@ -53,6 +53,8 @@ export function errorFromResponse(status, body) {
         'webhook_event_not_found',
         'invalid_body',
         'mpp_deposit_intent_not_found',
+        'classification_unknown',
+        'invalid_classification_slug',
     ];
     if (serverCode && known.includes(serverCode)) {
         return makeError(serverCode, message, status);
@@ -68,4 +70,21 @@ export function errorFromResponse(status, body) {
         return makeError('embedded_payments_unavailable', message, status);
     }
     return makeError('unknown', message, status);
+}
+/** The server's slug rule, mirrored so a typo is refused before a round trip. */
+const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const MAX_SLUG = 64;
+/**
+ * Normalise a `classification` option the way the server does — trimmed and
+ * lower-cased — and refuse anything that could never match a registered slug.
+ * Undefined or blank means "unclassified" and sends nothing.
+ */
+export function normalizeClassification(v) {
+    const slug = v?.trim().toLowerCase() ?? '';
+    if (!slug)
+        return undefined;
+    if (slug.length > MAX_SLUG || !SLUG_RE.test(slug)) {
+        throw makeError('invalid_classification_slug', `classification must be a slug (lower-case letters, digits and single hyphens, ${MAX_SLUG} characters or fewer)`);
+    }
+    return slug;
 }

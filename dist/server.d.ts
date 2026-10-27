@@ -55,6 +55,11 @@ export interface CreatePaymentOptions extends ServerOptions {
     clientRef?: string;
     /** Rides onto the request for the merchant. 200 characters or fewer. */
     memo?: string;
+    /** What the sale is FOR: the slug of a classification the merchant registered
+     *  (`hotel`, `travel`). Optional. Must be live on your key's tenant, or the
+     *  request is refused with `classification_unknown` and nothing is created.
+     *  Lower-case kebab, 64 characters or fewer; refused locally otherwise. */
+    classification?: string;
 }
 export interface PaymentRequest {
     /** Absent when the upstream did not answer — see `unconfirmed` in the README.
@@ -66,6 +71,8 @@ export interface PaymentRequest {
     currency?: Currency;
     deadline?: Date;
     clientRef?: string;
+    /** The classification slug the request was created with, when one was. */
+    classification?: string;
     /** The deep link to encode as a QR, when there is a request to pay. */
     payUrl?: string;
     /** The wallet link: any Base wallet holding USDC, no account. */

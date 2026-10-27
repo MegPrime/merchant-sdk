@@ -57,6 +57,11 @@ export type CheckoutErrorCode =
  | 'price_not_found'
 /** The price exceeds the ceiling set on this key when it was minted. */
  | 'price_over_key_cap'
+/** `classification` names no LIVE classification on this key's tenant:
+ *  unregistered, archived, or another tenant's. Nothing was created. */
+ | 'classification_unknown'
+/** `classification` is not a slug: lower-case kebab, 64 characters or fewer. */
+ | 'invalid_classification_slug'
 /** The merchant's deployment has no service credential; nothing could be
  *  created. An operator problem, not something the shopper did. */
  | 'embedded_payments_unavailable'
@@ -176,6 +181,10 @@ export interface CheckoutOptions {
     /** Rides onto the request for the merchant. Refused locally above 200 chars
      *  rather than spending a round trip to be told. */
     memo?: string;
+    /** What the sale is FOR: the slug of a classification the merchant registered
+     *  (`hotel`, `travel`). Optional. An unregistered or archived slug fails the
+     *  checkout with `classification_unknown` before anything is created. */
+    classification?: string;
     /** Omit for headless. A string is treated as a selector. */
     container?: HTMLElement | string;
     theme?: 'light' | 'dark' | 'auto';
