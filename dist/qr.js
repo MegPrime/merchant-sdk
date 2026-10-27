@@ -16,7 +16,7 @@
  * that scans cleanly and does nothing, which is the worst failure available —
  * it looks like it worked.
  */
-import { assertMppSupported, chainFor } from './env.js';
+import { chainFor } from './env.js';
 /** The error every function here throws when handed something unencodable. */
 export class QrInputError extends Error {
     constructor(message) {
@@ -128,12 +128,10 @@ export function walletQrDataUrl(fulfillmentId, options) {
 }
 /**
  * `ethereum:<MPP>@8453/transfer?address=<sendTo>&uint256=<amountBaseUnits>`.
- * Throws QrInputError on a malformed address or a non-integer amount, and a
- * CheckoutError `unsupported_on_sandbox` for env 'sandbox' (never a mainnet
- * URI from a testnet checkout).
+ * Throws QrInputError on a malformed address or a non-integer amount.
+ * On sandbox the chain id is 84532 and the token the test MPP.
  */
 export function mppTransferUri(sendTo, amountBaseUnits, o) {
-    assertMppSupported(o?.env);
     const chain = chainFor(o?.env);
     const mpp = chain.mppToken;
     const to = String(sendTo ?? '').trim();

@@ -2,7 +2,7 @@ import { isTerminal, } from './types.js';
 import { errorFromResponse, makeError, normalizeClassification } from './errors.js';
 import { uuid } from './uuid.js';
 import { payOriginsFor, payUrlFor } from './qr.js';
-import { assertMppSupported, gatewayFor } from './env.js';
+import { gatewayFor } from './env.js';
 import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
 const MAX_MEMO = 200;
 /**
@@ -188,7 +188,6 @@ export class Checkout {
      * request; the gateway's code otherwise).
      */
     async createMppDepositIntent(o) {
-        assertMppSupported(this.opts.env);
         const refund = assertRefundAddress(o?.refundAddress);
         const id = this.requireFulfillmentId();
         const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}`, {
@@ -202,7 +201,6 @@ export class Checkout {
     }
     /** Read back the deposit intent `createMppDepositIntent` issued. */
     async getMppDepositIntent() {
-        assertMppSupported(this.opts.env);
         const id = this.requireFulfillmentId();
         if (!this.mppIntentId) {
             throw makeError('invalid_options', 'no MPP deposit intent yet: call createMppDepositIntent first');
@@ -215,7 +213,6 @@ export class Checkout {
      * never creates one). 404 `mpp_deposit_intent_not_found` when they have none.
      */
     async resumeMppDepositIntent(o) {
-        assertMppSupported(this.opts.env);
         const refund = assertRefundAddress(o?.refundAddress);
         const id = this.requireFulfillmentId();
         const res = await this.mppFetch(`${this.gateway()}${mppDepositIntentPath(id)}?refund_address=${encodeURIComponent(refund)}`, { method: 'GET' });

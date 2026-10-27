@@ -94,7 +94,6 @@ export type CheckoutErrorCode =
  | 'invalid_options'
 /** Not available in the sandbox yet (MPP / pay from an exchange: there is no
  *  MPP token on Base Sepolia). Refused locally, before any request. */
- | 'unsupported_on_sandbox'
 /** Anything the SDK does not recognise. */
  | 'unknown';
 export interface CheckoutError extends Error {

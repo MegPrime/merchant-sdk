@@ -77,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.9.0
+npm install github:MegPrime/merchant-sdk#v0.9.1
 ```
 
 No registry account or token is needed. The package still installs as
@@ -348,18 +348,21 @@ directly (the Supabase examples above), `MEGPRIME_GATEWAY` stays
 | App pay host (`payUrl`) | `https://app.megprimepay.com` | `https://uat.megprimepay.com` | `https://dev.megprimepay.com` |
 | Wallet pay host (`walletPayUrl`) | `https://merchant.megprimepay.com` | `https://merchant-uat.megprimepay.com` | `https://merchant-dev.megprimepay.com` |
 | Chain | Base (8453) | Base (8453) | Base Sepolia (84532) |
-| Settlement token | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | testnet USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-| MPP / pay from an exchange | yes | yes | not yet (throws `unsupported_on_sandbox`) |
+| Settlement token | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | TestUSDC `0xbD50C0A517fD4A5F409002a5493E384eaf4fA7Fc` |
+| Payer token | MPP | MPP | test MPP `0xdbDf97AB328b7a8F772c0a704DEE2075fc1cF6cE` (18 dp) |
+| Pay from an exchange (deposit address) | yes | yes | not yet: the server answers `mpp_deposit_unavailable` |
 | Real money? | **Yes** | **Yes**: same chain and tokens as PROD, separate tenant | No: separate tenant, testnet tokens with no value |
 
-The sandbox is **coming soon**: the option exists now, but sandbox keys and
-hosts are not live until MegPrime announces them. Like UAT, it is a tenant of
-the PROD API (same gateway; the sandbox key selects it), on **Base Sepolia
-with testnet USDC** (free from the Circle faucet, https://faucet.circle.com,
-network Base Sepolia); nothing there is real money.
-MPP and pay from an exchange are not on the sandbox yet: those helpers throw
-`unsupported_on_sandbox` with `env: 'sandbox'`. UAT, by contrast, is real
-money on Base mainnet.
+Like UAT, the sandbox is a tenant of the PROD API (same gateway; the
+sandbox key selects it). It runs on **Base Sepolia** (84532): payers pay the
+**test MPP** token (`0xdbDf97AB328b7a8F772c0a704DEE2075fc1cF6cE`, 18 dp) and
+the store receives **TestUSDC** (`0xbD50C0A517fD4A5F409002a5493E384eaf4fA7Fc`).
+There is no Circle faucet for these: ask MegPrime for test tokens. Payers pay
+from a connected wallet (the pay link or QR). Pay from an exchange (a deposit
+address) is not on the sandbox yet: the SDK no longer refuses it, but the server
+answers `mpp_deposit_unavailable` until it is enabled there; `mppTransferUri`
+already uses 84532 and the test MPP.
+Nothing there is real money. UAT, by contrast, is real money on Base mainnet.
 
 ---
 

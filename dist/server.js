@@ -32,7 +32,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { errorFromResponse, makeError, normalizeClassification } from './errors.js';
 import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
 export { formatMppBaseUnits, MPP_TOKEN_ADDRESS, BASE_CHAIN_ID, MPP_DECIMALS } from './mpp.js';
-import { assertMppSupported, gatewayFor } from './env.js';
+import { gatewayFor } from './env.js';
 export { ENVS, GATEWAYS, CHAINS, BASE_SEPOLIA_CHAIN_ID, USDC_BASE_ADDRESS, USDC_BASE_SEPOLIA_ADDRESS, gatewayFor, chainFor, } from './env.js';
 /**
  * Refuse to run in a browser.
@@ -236,7 +236,6 @@ export async function getPaymentStatus(fulfillmentId, o) {
  * the request; anything the forwarder cannot route is returned there.
  */
 export async function createMppDepositIntent(fulfillmentId, o) {
-    assertMppSupported(o?.env); // sandbox: no MPP token yet, refused before any request
     const refund = assertRefundAddress(o?.refundAddress);
     const id = fulfillmentId?.trim();
     if (!id)

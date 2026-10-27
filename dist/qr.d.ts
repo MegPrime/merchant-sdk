@@ -107,16 +107,15 @@ export declare function walletPayUrlFor(fulfillmentId: string, origin?: string):
 export declare function walletQrSvg(fulfillmentId: string, options?: QrOptions): Promise<string>;
 /** PNG data-URL QR of the wallet link for a fulfillment id. */
 export declare function walletQrDataUrl(fulfillmentId: string, options?: QrOptions): Promise<string>;
-/** Which environment the MPP transfer is for. MPP exists on PROD/UAT (Base) only. */
+/** Which environment the MPP transfer is for. MPP on Base (PROD/UAT) or the test MPP on Base Sepolia (sandbox). */
 export interface MppQrOptions {
-    /** Defaults to 'prod'. 'sandbox' throws `unsupported_on_sandbox`: there is no MPP token on Base Sepolia yet. */
+    /** Defaults to 'prod'. 'sandbox' uses the test MPP token on Base Sepolia (84532). */
     env?: PayEnv;
 }
 /**
  * `ethereum:<MPP>@8453/transfer?address=<sendTo>&uint256=<amountBaseUnits>`.
- * Throws QrInputError on a malformed address or a non-integer amount, and a
- * CheckoutError `unsupported_on_sandbox` for env 'sandbox' (never a mainnet
- * URI from a testnet checkout).
+ * Throws QrInputError on a malformed address or a non-integer amount.
+ * On sandbox the chain id is 84532 and the token the test MPP.
  */
 export declare function mppTransferUri(sendTo: string, amountBaseUnits: string, o?: MppQrOptions): string;
 /** SVG QR of the MPP transfer. Uses the same renderer and options as the codes above. */

@@ -9,8 +9,12 @@ export declare const BASE_CHAIN_ID = 8453;
 export declare const BASE_SEPOLIA_CHAIN_ID = 84532;
 /** USDC on Base mainnet. */
 export declare const USDC_BASE_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-/** Circle's testnet USDC on Base Sepolia (faucet: https://faucet.circle.com). */
+/** Circle's testnet USDC on Base Sepolia (not the sandbox settlement token; see TEST_USDC_BASE_SEPOLIA_ADDRESS). */
 export declare const USDC_BASE_SEPOLIA_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+/** The sandbox's test MPP token on Base Sepolia (18 dp). MegPrime issues test tokens on request. */
+export declare const TEST_MPP_BASE_SEPOLIA_ADDRESS = "0xdbDf97AB328b7a8F772c0a704DEE2075fc1cF6cE";
+/** The sandbox's TestUSDC on Base Sepolia (6 dp): what the store receives. */
+export declare const TEST_USDC_BASE_SEPOLIA_ADDRESS = "0xbD50C0A517fD4A5F409002a5493E384eaf4fA7Fc";
 /** The MPP token on Base mainnet. */
 export declare const MPP_TOKEN_ADDRESS = "0x6E02F4A1631379a49e8B7E222CfA6Bf913b05E89";
 export interface ChainInfo {
@@ -25,7 +29,7 @@ export interface ChainInfo {
         address: string;
         decimals: 6;
     };
-    /** The MPP token, when pay-from-an-exchange is available here. Absent on the sandbox. */
+    /** The MPP token, when pay-from-an-exchange is available here. On the sandbox it is the test MPP token. */
     mppToken?: {
         symbol: 'MPP';
         address: string;
@@ -43,9 +47,3 @@ export declare function gatewayFor(o?: {
 }): string;
 /** Chain and tokens for an environment. */
 export declare function chainFor(env?: PayEnv): ChainInfo;
-/**
- * Refuse MPP (pay from an exchange) where there is no MPP token: the sandbox,
- * until phase 2. Throws `unsupported_on_sandbox` before any request, rather
- * than handing a payer a mainnet transfer from a testnet checkout.
- */
-export declare function assertMppSupported(env?: PayEnv): void;
