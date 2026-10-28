@@ -60,6 +60,11 @@ export interface CreatePaymentOptions extends ServerOptions {
      *  request is refused with `classification_unknown` and nothing is created.
      *  Lower-case kebab, 64 characters or fewer; refused locally otherwise. */
     classification?: string;
+    /** The merchant reward percentage that applies to this sale, as your server
+     *  states it: 0 to 100, at most 2 decimals (`2.5`, `10`). Optional. Recorded
+     *  on the request and returned on reads and webhooks; it does not change the
+     *  amount, fees or routing. Refused locally otherwise. */
+    merchantRewardPercentage?: number | string;
 }
 export interface PaymentRequest {
     /** Absent when the upstream did not answer — see `unconfirmed` in the README.
@@ -73,6 +78,8 @@ export interface PaymentRequest {
     clientRef?: string;
     /** The classification slug the request was created with, when one was. */
     classification?: string;
+    /** The merchant reward percentage the request was created with, when one was. */
+    merchantRewardPercentage?: number;
     /** The deep link to encode as a QR, when there is a request to pay. */
     payUrl?: string;
     /** The wallet link: any Base wallet holding USDC, no account. */

@@ -1,6 +1,7 @@
 {
   "name": "@megprime/merchant-sdk",
-  "version": "0.9.1",
+  "version": "0.9.2",
+  "private": false,
   "description": "Take payments into a MegPrime store from your own app. No backend required.",
   "type": "module",
   "main": "./dist/index.js",
@@ -40,6 +41,5 @@
     "type": "git",
     "url": "git+https://github.com/MegPrime/merchant-sdk.git"
   },
-  "homepage": "https://github.com/MegPrime/merchant-sdk#readme",
-  "private": false
+  "homepage": "https://github.com/MegPrime/merchant-sdk#readme"
 }

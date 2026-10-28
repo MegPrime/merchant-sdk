@@ -62,6 +62,9 @@ export type CheckoutErrorCode =
  | 'classification_unknown'
 /** `classification` is not a slug: lower-case kebab, 64 characters or fewer. */
  | 'invalid_classification_slug'
+/** `merchantRewardPercentage` is not a number from 0 to 100 with at most 2
+ *  decimals. Refused locally; the server answers 400 with the same code. */
+ | 'invalid_merchant_reward_percentage'
 /** The merchant's deployment has no service credential; nothing could be
  *  created. An operator problem, not something the shopper did. */
  | 'embedded_payments_unavailable'

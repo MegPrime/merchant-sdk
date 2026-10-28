@@ -55,6 +55,7 @@ export function errorFromResponse(status, body) {
         'mpp_deposit_intent_not_found',
         'classification_unknown',
         'invalid_classification_slug',
+        'invalid_merchant_reward_percentage',
     ];
     if (serverCode && known.includes(serverCode)) {
         return makeError(serverCode, message, status);
@@ -87,4 +88,21 @@ export function normalizeClassification(v) {
         throw makeError('invalid_classification_slug', `classification must be a slug (lower-case letters, digits and single hyphens, ${MAX_SLUG} characters or fewer)`);
     }
     return slug;
+}
+/** The server's rule: a plain number from 0 to 100 with at most 2 decimals. */
+const REWARD_RE = /^(0|[1-9][0-9]{0,2})(\.[0-9]{1,2})?$/;
+/**
+ * Check a `merchantRewardPercentage` option the way the server does and return
+ * the number to send. Undefined means "none stated" and sends nothing. A
+ * number is checked by its shortest decimal form, so 2.5 passes and 1e-7 or
+ * 2.555 do not; a string is accepted for callers holding a decimal string.
+ */
+export function normalizeRewardPercentage(v) {
+    if (v === undefined)
+        return undefined;
+    const text = typeof v === 'number' ? (Number.isFinite(v) ? String(v) : '') : String(v).trim();
+    if (!REWARD_RE.test(text) || Number(text) > 100) {
+        throw makeError('invalid_merchant_reward_percentage', 'merchantRewardPercentage must be a number from 0 to 100 with at most 2 decimal places');
+    }
+    return Number(text);
 }

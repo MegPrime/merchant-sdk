@@ -77,7 +77,7 @@ onSuccess ──────────────────►   GET status
 ## 3. Install
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.9.1
+npm install github:MegPrime/merchant-sdk#v0.9.2
 ```
 
 No registry account or token is needed. The package still installs as
@@ -109,7 +109,8 @@ X-Secret-Key: msk_…
   "notional_uoa": "12500000",     // required. positive integer string, minor units, ≤ 39 digits
   "client_ref":   "<attempt uuid>", // strongly recommended. must be a UUID
   "memo":         "Booking #123", // optional. ≤ 200 chars, shown to the merchant
-  "classification": "hotel"       // optional. a slug the merchant registered (what the sale is FOR)
+  "classification": "hotel",      // optional. a slug the merchant registered (what the sale is FOR)
+  "merchant_reward_percentage": 2.5 // optional. JSON number 0-100, ≤ 2 decimals. Recorded only
 }
 ```
 
@@ -140,6 +141,7 @@ Errors look like `{ "error": "<code>" }`:
 | 400 | `invalid_body` | Malformed JSON, `client_ref` isn't a UUID, or `memo` is over 200 characters. |
 | 422 | `classification_unknown` | `classification` is not a live slug on this key's tenant. Nothing was created. Fix the slug (or register it); don't retry as-is. |
 | 422 | `invalid_classification_slug` | `classification` isn't a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`, ≤ 64). A bug in your code. |
+| 400 | `invalid_merchant_reward_percentage` | `merchant_reward_percentage` isn't a JSON number from 0 to 100 with at most 2 decimals (a string, `1e1` or `10.000` is refused too). A bug in your code. |
 | 429 | `rate_limited` | Back off, then retry with the **same** `client_ref`. |
 | 503 | `embedded_payments_unavailable`, `payment_requests_unavailable`, `store_payee_unavailable` | Problem on the merchant's side. Retry later with the **same** `client_ref`. |
 

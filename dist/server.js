@@ -29,7 +29,7 @@
  */
 import { Buffer } from 'node:buffer';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { errorFromResponse, makeError, normalizeClassification } from './errors.js';
+import { errorFromResponse, makeError, normalizeClassification, normalizeRewardPercentage } from './errors.js';
 import { assertRefundAddress, mppDepositIntentPath, toMppDepositIntent, } from './mpp.js';
 export { formatMppBaseUnits, MPP_TOKEN_ADDRESS, BASE_CHAIN_ID, MPP_DECIMALS } from './mpp.js';
 import { gatewayFor } from './env.js';
@@ -103,6 +103,9 @@ function date(v) {
     const d = new Date(v);
     return Number.isNaN(d.getTime()) ? undefined : d;
 }
+function num(v) {
+    return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
 function str(v) {
     return typeof v === 'string' && v !== '' ? v : undefined;
 }
@@ -118,12 +121,14 @@ export async function createPaymentRequest(o) {
         throw makeError('invalid_options', 'memo must be 200 characters or fewer');
     }
     const classification = normalizeClassification(o.classification);
+    const rewardPct = normalizeRewardPercentage(o.merchantRewardPercentage);
     payOriginsFor(o); // refuse a bad env before the request exists, not after
     return call('/api/v1/mpmerchant/server/pay-requests', 'POST', o, {
         notional_uoa: amount,
         ...(o.clientRef ? { client_ref: o.clientRef } : {}),
         ...(o.memo ? { memo: o.memo } : {}),
         ...(classification ? { classification } : {}),
+        ...(rewardPct !== undefined ? { merchant_reward_percentage: rewardPct } : {}),
     }, (d) => {
         const id = str(d.fulfillment_id);
         return {
@@ -134,6 +139,7 @@ export async function createPaymentRequest(o) {
             deadline: date(d.deadline),
             clientRef: str(d.client_ref),
             classification: str(d.classification),
+            merchantRewardPercentage: num(d.merchant_reward_percentage),
             // Built here so nothing downstream has to know the URL shape. Absent
             // exactly when the id is — a link to nothing is worse than no link.
             ...(id ? payLinks(id, o) : {}),
@@ -521,6 +527,8 @@ export async function getPaymentRequest(o) {
             currency: d.currency ?? undefined,
             deadline: date(d.deadline),
             clientRef: str(d.client_ref),
+            classification: str(d.classification),
+            merchantRewardPercentage: num(d.merchant_reward_percentage),
             memo: str(d.memo),
             status: str(d.status)?.toLowerCase(),
             settledAt: date(d.settled_at),

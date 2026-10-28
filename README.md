@@ -4,7 +4,7 @@ Take payments into a MegPrime store from your own application. No backend of
 your own required.
 
 ```bash
-npm install github:MegPrime/merchant-sdk#v0.9.1
+npm install github:MegPrime/merchant-sdk#v0.9.2
 ```
 
 No registry account or token is needed. The package still installs as
@@ -409,7 +409,8 @@ an unknown `type` as "ignore and answer 2xx": new types can be added.
 **Payment request object:** `id` (request id), `fulfillment_id`, `store_id`,
 `terminal_id`, `client_ref`, `notional_uoa` (minor units, string), `currency`
 (`symbol`, `decimals`, `address`, `chain_id`), `memo`, `classification` and
-`classification_id` (only when the sale was created with one), `reference`,
+`classification_id` (only when the sale was created with one),
+`merchant_reward_percentage` (a JSON number, only when the sale was created with one), `reference`,
 `receiver_wallet`, `request_token`, `chain_id`, `device_paired`, `deadline`,
 `status` (the payments core's last status, not normalised: lowercase it),
 `status_at`, `settled_at`, `voided_at`, `created_at`, `updated_at`; plus
@@ -553,6 +554,7 @@ const sale = await createPaymentRequest({
   amountUoa: '12500000',          // minor units. Never a float
   clientRef: order.id,            // one per sale: a retry returns the SAME request
   classification: 'hotel',        // optional: a slug the merchant registered (what the sale is FOR)
+  merchantRewardPercentage: 2.5,  // optional: 0-100, at most 2 decimals; recorded only (server routes only)
 });
 // send the browser sale.fulfillmentId — and nothing else
 
@@ -636,6 +638,7 @@ Branch on `err.code`, never on `err.message`.
 | `price_over_key_cap` | no | the price exceeds this key's ceiling |
 | `classification_unknown` | no | `classification` is not a live slug on this key's tenant (unregistered, archived, or another tenant's); nothing was created |
 | `invalid_classification_slug` | no | `classification` is not a slug: lower-case letters, digits and single hyphens, 64 characters or fewer (refused locally) |
+| `invalid_merchant_reward_percentage` | no | `merchantRewardPercentage` is not a number from 0 to 100 with at most 2 decimals (refused locally; the server answers 400) |
 | `embedded_payments_unavailable` | yes | the merchant's deployment is incomplete |
 | `rate_limited` | yes | too many requests from this key or address |
 | `network` | yes | the request never got an answer |
